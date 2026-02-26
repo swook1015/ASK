@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <header>
         <div class="header-container">
@@ -25,8 +27,9 @@
         <ul>
             <li><a href="main.html"><i class="fas fa-house"></i> 홈</a></li>
             <li><a href="index.html"><i class="fas fa-desktop"></i> 대시보드</a></li>
-            <li><a href="intro.html"><i class="fas fa-info-circle"></i> 서비스 소개</a></li>
             <li><a href="history.html" class="active"><i class="fas fa-history"></i> 과거 데이터</a></li>
+            <li><a href="intro.html"><i class="fas fa-info-circle"></i> 서비스 소개</a></li>
+            
         </ul>
     </nav>
     <div id="overlay" class="overlay"></div>
@@ -39,38 +42,38 @@
 
     <main class="content-container">
         <div class="history-grid">
-        <section class="history-left">
-            <div class="section-header">
-                <h3><i class="fas fa-list"></i> 상세 이력 로그</h3>
-                <button onclick="localStorage.removeItem('risk_logs'); location.reload();" class="btn-clear">초기화</button>
-            </div>
-            
-            <div class="table-wrapper box-style">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>일시</th>
-                            <th>등급</th>
-                            <th>내용</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-body">
-                        </tbody>
-                </table>
-            </div>
-            
-            <div id="pagination" class="pagination-container"></div>
-        </section>
+            <section class="history-left">
+                <div class="section-header">
+                    <h3><i class="fas fa-list"></i> 상세 이력 로그</h3>
+                    <input type="date" id="date-filter" class="filter-input">
+                </div>
 
-        <section class="history-right">
-            <div class="section-header">
-                <h3><i class="fas fa-chart-bar"></i> 날짜별 통계</h3>
-            </div>
-            
-            <div class="graph-wrapper box-style">
-                <canvas id="riskChart"></canvas>
-            </div>
-        </section>
+                <div class="table-wrapper box-style">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>일시</th>
+                                <th>등급</th>
+                                <th>내용</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="pagination" class="pagination-container"></div>
+            </section>
+
+            <section class="history-right">
+                <div class="section-header">
+                    <h3><i class="fas fa-chart-bar"></i> 날짜별 통계</h3>
+                </div>
+
+                <div class="graph-wrapper box-style">
+                    <canvas id="riskChart"></canvas>
+                </div>
+            </section>
         </div>
     </main>
 
@@ -98,4 +101,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>
