@@ -91,7 +91,7 @@ export class Recorder {
 
         const inputArgs =
             process.platform === "win32"
-                ? ["-f", "dshow", "-video_size", size, "-framerate", String(this.fps), "-i", this.devicePath]
+                ? ["-f", "dshow",  "-i", this.devicePath]
                 : ["-f", "v4l2", "-framerate", String(this.fps), "-video_size", size, "-i", this.devicePath];
 
         const args = [
