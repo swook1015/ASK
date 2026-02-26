@@ -1,0 +1,1063 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>자동화 컨테이너팜</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script> -->
+  <!-- <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/webfontworld/ridi/RIDIBatang.css"> -->
+  <style>
+    :root{--app-bg:#EEF2FF;--header-bg:#D9E0F0;}
+    body{background:var(--app-bg)!important;color:#0f172a;font-family:'RIDIBatang','Noto Serif KR',serif;}
+    header{background:var(--header-bg)!important;border-bottom:1px solid #cbd5e1!important;}
+    .hamburger{inline-size:44px;block-size:44px;display:grid;place-items:center;border-radius:12px;background:transparent;border:1px solid rgba(15,23,42,.15);cursor:pointer;}
+    .hamburger svg{width:24px;height:24px;}
+    .hamburger .bar{stroke:#334155;stroke-width:2.2;stroke-linecap:round;}
+    .drawer{position:fixed;inset:0 auto 0 0;width:76%;max-width:300px;background:#0f172a;border-right:1px solid rgba(148,163,184,.18);transform:translateX(-100%);transition:transform .25s ease;z-index:40;display:grid;grid-template-rows:auto 1fr auto;color:#e2e8f0;}
+    .drawer.open{transform:translateX(0);}
+    .drawer-header{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid rgba(148,163,184,.18);}
+    .icon-button{inline-size:40px;block-size:40px;display:grid;place-items:center;border-radius:10px;background:transparent;color:#e2e8f0;border:1px solid rgba(148,163,184,.18);}
+    .drawer-nav{padding:16px 12px;display:flex;flex-direction:column;gap:4px;}
+    .menu-link{background:transparent;color:#e2e8f0;font-size:15px;text-align:left;padding:10px 16px;border:none;border-radius:8px;transition:background .2s;}
+    .menu-link:hover{background:rgba(255,255,255,.05);}
+    .drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(1px);z-index:30;}
+    .drawer-backdrop.hidden{display:none;}
+    .tile{background:#ffffff!important;border:1px solid #e2e8f0!important;color:#0f172a!important;border-radius:12px;padding:8px;}
+    .tile-k{color:#475569!important;font-size:12px;}
+    .tile-v{color:#0f172a!important;font-size:20px;font-weight:700;white-space:nowrap;} /* 줄바꿈 방지 */
+    button{touch-action:manipulation;}
+    #logoBtn{color:#111827!important;font-size:30px;font-weight:400;letter-spacing:2px;}
+    .chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:9999px;border:1px solid #cbd5e1;background:#eef2ff;color:#334155;}
+
+    /* 디지트 보드 */
+    .digit{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: clamp(22px, 5.2vw, 36px);
+      line-height: 1.05; letter-spacing:.5px; font-weight:800; color:#0f172a; white-space:nowrap;
+    }
+    .digit-unit{font-size:12px;margin-left:4px;color:#64748b;font-weight:700;white-space:nowrap;}
+    .k-mini{color:#64748b;font-size:11px;}
+
+    /* 언어 드롭다운 */
+    .lang-btn{inline-size:36px;block-size:36px;border-radius:10px;border:1px solid rgba(15,23,42,.15);background:#fff;display:grid;place-items:center}
+    .lang-menu{position:absolute;right:42px;top:48px;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:6px;display:none;z-index:50;min-width:150px}
+    .lang-menu.open{display:block;}
+    .lang-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;font-size:14px;color:#0f172a}
+    .lang-item:hover{background:#eef2ff;}
+    @media (prefers-reduced-motion: reduce){ .drawer{transition:none;} }
+
+    /* ===================== 컨테이너 쿼리 세팅 ===================== */
+    .header-cq{ container-type:inline-size; container-name:header; }
+    .ctrl-cq{   container-type:inline-size; container-name:ctrl;   }
+    .card-cq{   container-type:inline-size; container-name:card;   }
+    .digits-cq{ container-type:inline-size; container-name:digits; }
+
+    /* HEADER: 제목/배지 축소 */
+    @container header (max-width: 420px){
+      #logoBtn{ font-size: 24px !important; letter-spacing: 1px; }
+      #pill{ transform: scale(.90); transform-origin: right center; }
+      .lang-btn{ transform: scale(.90); }
+    }
+    @container header (max-width: 340px){
+      #logoBtn{ font-size: 20px !important; letter-spacing: .5px; }
+      #pill{ transform: scale(.85); }
+    }
+
+    /* CTRL BAR: 항상 한 줄 유지하도록 컴팩트화 */
+    @container ctrl (max-width: 560px){
+      #btnStart,#btnStop{ padding:6px 10px !important; font-size:12px; }
+      #intervalSel,#viewSel{ padding:6px 10px !important; font-size:12px; min-width:92px; }
+      .ctrl-cq{ gap:6px; }
+    }
+    @container ctrl (max-width: 420px){
+      #intervalSel,#viewSel{ min-width:80px; }
+    }
+
+    /* CHART CARD: 제목/타일 숫자 단계 축소 */
+    @container card (max-width: 520px){
+      .card-cq h3{ font-size: 15px; }
+      .tile-v{ font-size: 18px !important; }
+      .tile-k{ font-size: 11px !important; }
+    }
+    @container card (max-width: 420px){
+      .card-cq h3{ font-size: 14px; }
+      .tile-v{ font-size: 16px !important; }
+    }
+
+    /* DIGITS 그리드: 숫자/단위 자동 축소 */
+    @container digits (max-width: 520px){
+      .digit{ font-size: clamp(18px, 5vw, 28px); }
+      .digit-unit{ font-size: 11px; }
+    }
+    @container digits (max-width: 380px){
+      .digit{ font-size: clamp(16px, 5.2vw, 24px); }
+      .digit-unit{ font-size: 10px; }
+    }
+  </style>
+... (834줄 남음)
+
+12345.html
+49KB
+https://github.com/IoTKETI/Mobius?tab=readme-ov-file
+GitHub
+GitHub - IoTKETI/Mobius: oneM2M IoT Server Platform
+oneM2M IoT Server Platform. Contribute to IoTKETI/Mobius development by creating an account on GitHub.
+oneM2M IoT Server Platform. Contribute to IoTKETI/Mobius development by creating an account on GitHub.
+https://github.com/IoTKETI/nCube-Thyme-Nodejs/tree/master
+GitHub
+GitHub - IoTKETI/nCube-Thyme-Nodejs: &Cube:Thyme for Nodejs
+&Cube:Thyme for Nodejs. Contribute to IoTKETI/nCube-Thyme-Nodejs development by creating an account on GitHub.
+&Cube:Thyme for Nodejs. Contribute to IoTKETI/nCube-Thyme-Nodejs development by creating an account on GitHub.
+허성욱 — 어제 오후 9:15
+백엔드 - 이력관리, 원격모니터링, 위험 상황 알림, 확장성, 모듈성 등등
+상혁 — 오후 2:09
+data : camId, t,v
+pi : /Mobius/raspi/fall/{camId}
+ri : /Mobius/raspi/fall/{camId}/날짜
+con: {"camId":"0","t":"2025-10-30T00:55:30-04:00","v":"fall"}
+허성욱 — 오후 4:17
+192.168.0.2:8080
+허성욱 — 오후 5:28
+백엔드 LSTM = 실시간 추론 + 주기적 학습 
+허성욱 — 오후 5:40
+코랄 보드 ssh 공개키
+
+C:\Windows\System32>type %USERPROFILE%.config\mdt\keys\mdt.key.pub
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD5/JXMr69kFI01JacDeXg4n8wIVrxRFaGlavms7gsQnXKjlxlQCsxVLR20mOTPfXAT46RgzYFAKy+JQCCmrXt9vAwxleZcNJnv4ZxnXJZKZjhJ7P44Y2RusZWkBX0jJjNuwQhciQHa23hdTpTdOCbVFpg6CPUTVKgC+oCz+cqokT68fzoar9bpOh9V88ZwQf1e4SZJoEqTn6oEQqFBMWRN6AB0fr4We3P17o5E4eMd2sxLUzKPihLTmjN6oFLLITr/H+IH8+IKMHb7Rhsq/7Qii4XphqTCbHFGqe7MphSzllS09g9i1LBOMIRCibUd96Z5B0L7YMyPXrlzhFYuyxKAt3CVbSaHBCLboXCT7iu9ro+MTI89uM5GRqY3EEMazymxgjTtqSkkwRG49DwyT97G0LfRVljPueokn/yp8ZT//COjfCPY8pB3JVyi145T2epGR2XxHyl0ovkJ4R5CCfv/Ot/1IEE1SxJEmkDhK4G+CAwMbaWCwUpfH0ugEF8hwE0= owner@DESKTOP-82KFQLK 
+﻿
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>자동화 컨테이너팜</title>
+  <script src="3.4.17.js"></script>
+  <script src="chart.umd.min.js"></script>
+  <!-- <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script> -->
+  <!-- <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/webfontworld/ridi/RIDIBatang.css"> -->
+  <style>
+    :root{--app-bg:#EEF2FF;--header-bg:#D9E0F0;}
+    body{background:var(--app-bg)!important;color:#0f172a;font-family:'RIDIBatang','Noto Serif KR',serif;}
+    header{background:var(--header-bg)!important;border-bottom:1px solid #cbd5e1!important;}
+    .hamburger{inline-size:44px;block-size:44px;display:grid;place-items:center;border-radius:12px;background:transparent;border:1px solid rgba(15,23,42,.15);cursor:pointer;}
+    .hamburger svg{width:24px;height:24px;}
+    .hamburger .bar{stroke:#334155;stroke-width:2.2;stroke-linecap:round;}
+    .drawer{position:fixed;inset:0 auto 0 0;width:76%;max-width:300px;background:#0f172a;border-right:1px solid rgba(148,163,184,.18);transform:translateX(-100%);transition:transform .25s ease;z-index:40;display:grid;grid-template-rows:auto 1fr auto;color:#e2e8f0;}
+    .drawer.open{transform:translateX(0);}
+    .drawer-header{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid rgba(148,163,184,.18);}
+    .icon-button{inline-size:40px;block-size:40px;display:grid;place-items:center;border-radius:10px;background:transparent;color:#e2e8f0;border:1px solid rgba(148,163,184,.18);}
+    .drawer-nav{padding:16px 12px;display:flex;flex-direction:column;gap:4px;}
+    .menu-link{background:transparent;color:#e2e8f0;font-size:15px;text-align:left;padding:10px 16px;border:none;border-radius:8px;transition:background .2s;}
+    .menu-link:hover{background:rgba(255,255,255,.05);}
+    .drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(1px);z-index:30;}
+    .drawer-backdrop.hidden{display:none;}
+    .tile{background:#ffffff!important;border:1px solid #e2e8f0!important;color:#0f172a!important;border-radius:12px;padding:8px;}
+    .tile-k{color:#475569!important;font-size:12px;}
+    .tile-v{color:#0f172a!important;font-size:20px;font-weight:700;white-space:nowrap;} /* 줄바꿈 방지 */
+    button{touch-action:manipulation;}
+    #logoBtn{color:#111827!important;font-size:30px;font-weight:400;letter-spacing:2px;}
+    .chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:9999px;border:1px solid #cbd5e1;background:#eef2ff;color:#334155;}
+
+    /* 디지트 보드 */
+    .digit{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: clamp(22px, 5.2vw, 36px);
+      line-height: 1.05; letter-spacing:.5px; font-weight:800; color:#0f172a; white-space:nowrap;
+    }
+    .digit-unit{font-size:12px;margin-left:4px;color:#64748b;font-weight:700;white-space:nowrap;}
+    .k-mini{color:#64748b;font-size:11px;}
+
+    /* 언어 드롭다운 */
+    .lang-btn{inline-size:36px;block-size:36px;border-radius:10px;border:1px solid rgba(15,23,42,.15);background:#fff;display:grid;place-items:center}
+    .lang-menu{position:absolute;right:42px;top:48px;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:6px;display:none;z-index:50;min-width:150px}
+    .lang-menu.open{display:block;}
+    .lang-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;font-size:14px;color:#0f172a}
+    .lang-item:hover{background:#eef2ff;}
+    @media (prefers-reduced-motion: reduce){ .drawer{transition:none;} }
+
+    /* ===================== 컨테이너 쿼리 세팅 ===================== */
+    .header-cq{ container-type:inline-size; container-name:header; }
+    .ctrl-cq{   container-type:inline-size; container-name:ctrl;   }
+    .card-cq{   container-type:inline-size; container-name:card;   }
+    .digits-cq{ container-type:inline-size; container-name:digits; }
+
+    /* HEADER: 제목/배지 축소 */
+    @container header (max-width: 420px){
+      #logoBtn{ font-size: 24px !important; letter-spacing: 1px; }
+      #pill{ transform: scale(.90); transform-origin: right center; }
+      .lang-btn{ transform: scale(.90); }
+    }
+    @container header (max-width: 340px){
+      #logoBtn{ font-size: 20px !important; letter-spacing: .5px; }
+      #pill{ transform: scale(.85); }
+    }
+
+    /* CTRL BAR: 항상 한 줄 유지하도록 컴팩트화 */
+    @container ctrl (max-width: 560px){
+      #btnStart,#btnStop{ padding:6px 10px !important; font-size:12px; }
+      #intervalSel,#viewSel{ padding:6px 10px !important; font-size:12px; min-width:92px; }
+      .ctrl-cq{ gap:6px; }
+    }
+    @container ctrl (max-width: 420px){
+      #intervalSel,#viewSel{ min-width:80px; }
+    }
+
+    /* CHART CARD: 제목/타일 숫자 단계 축소 */
+    @container card (max-width: 520px){
+      .card-cq h3{ font-size: 15px; }
+      .tile-v{ font-size: 18px !important; }
+      .tile-k{ font-size: 11px !important; }
+    }
+    @container card (max-width: 420px){
+      .card-cq h3{ font-size: 14px; }
+      .tile-v{ font-size: 16px !important; }
+    }
+
+    /* DIGITS 그리드: 숫자/단위 자동 축소 */
+    @container digits (max-width: 520px){
+      .digit{ font-size: clamp(18px, 5vw, 28px); }
+      .digit-unit{ font-size: 11px; }
+    }
+    @container digits (max-width: 380px){
+      .digit{ font-size: clamp(16px, 5.2vw, 24px); }
+      .digit-unit{ font-size: 10px; }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen overflow-x-hidden">
+  <!-- ===== HEADER ===== -->
+  <header class="p-3 sticky top-0 z-30">
+    <div class="mx-auto flex items-center justify-between relative
+                max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl header-cq">
+      <button id="menuBtn" class="hamburger" aria-label="메뉴 열기">
+        <svg viewBox="0 0 24 24">
+          <line class="bar" x1="4" x2="20" y1="7"  y2="7"/>
+          <line class="bar" x1="4" x2="20" y1="12" y2="12"/>
+          <line class="bar" x1="4" x2="20" y1="17" y2="17"/>
+        </svg>
+      </button>
+      <button id="logoBtn" class="text-base font-semibold select-none"><b id="txt-title">자동화 컨테이너팜</b></button>
+
+      <div class="flex items-center gap-1 sm:gap-2">
+        <button id="langBtn" class="lang-btn" aria-label="언어">🌐</button>
+        <div id="langMenu" class="lang-menu">
+          <button class="lang-item" data-lang="ko">🇰🇷 한국어</button>
+          <button class="lang-item" data-lang="en">🇺🇸 English</button>
+          <button class="lang-item" data-lang="ja">🇯🇵 日本語</button>
+        </div>
+        <span id="pill" class="text-[11px] px-2 py-1 rounded-full" style="background:#d7deee;color:#0f172a;">대기</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== DRAWER ===== -->
+  <aside id="sideMenu" class="drawer">
+    <div class="drawer-header">
+      <span class="text-sm font-semibold" id="txt-menu">메뉴</span>
+      <button id="closeMenu" class="icon-button">✕</button>
+    </div>
+    <nav class="drawer-nav">
+      <button class="menu-link" data-target="introduce" id="txt-nav-intro">Introduce</button>
+      <button class="menu-link" data-target="project" id="txt-nav-proj">Project</button>
+    </nav>
+  </aside>
+  <div id="backdrop" class="drawer-backdrop hidden"></div>
+
+  <!-- ===== MAIN ===== -->
+  <main class="mx-auto p-4 sm:p-5 md:p-6 space-y-4
+               max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl">
+    <!-- 소개 -->
+    <section id="view-introduce" class="rounded-2xl overflow-hidden" style="border:1px solid #cbd5e1;">
+      <figure class="relative">
+        <img src="containerfarm.jpg" alt="컨테이너팜 소개" class="w-full h-56 object-cover sm:h-72" />
+        <figcaption class="absolute bottom-0 left-0 right-0 p-4" style="background:linear-gradient(to top, rgba(0,0,0,.6), transparent); color:#fff;">
+          <div class="text-lg font-semibold" id="txt-hero-title">컨테이너팜</div>
+          <div class="text-[12px]" id="txt-hero-sub">센서 기반 환경 모니터링 · 자동 제어 시스템</div>
+        </figcaption>
+      </figure>
+      <div class="p-4 text-sm" style="color:#334155;" id="txt-intro-desc">
+        좌측 상단의 메뉴에서 <b>Project</b>를 누르면 실시간 센서 데이터를 확인할 수 있습니다.
+      </div>
+      <div class="px-4 pb-4">
+        <button class="px-4 py-2 rounded-xl text-white" style="background:#0ea5e9" onclick="show('project')"><b id="btn-open-dashboard">실시간 대시보드 열기</b></button>
+      </div>
+    </section>
+
+    <!-- 프로젝트 -->
+    <section id="view-project" class="hidden space-y-4">
+      <!-- 상단 컨트롤바 -->
+      <div class="sticky top-[64px] z-20 rounded-2xl p-3 flex flex-wrap items-center gap-2 ctrl-cq"
+           style="border:1px solid #cbd5e1;background:#fff">
+        <div class="flex items-center gap-2">
+          <button id="btnStart" class="px-3 py-2 rounded-xl text-white" style="background:#10b981"><b id="txt-start">시작</b></button>
+          <button id="btnStop"  class="px-3 py-2 rounded-xl text-white" style="background:#f11717"><b id="txt-stop">중지</b></button>
+        </div>
+        <div class="flex items-center gap-2 ml-auto">
+          <select id="intervalSel" class="px-3 py-2 rounded-xl" style="background:#eef2ff;border:1px solid #cbd5e1">
+            <option id="opt-3" value="3">3초</option>
+            <option id="opt-5" value="5">5초</option>
+            <option id="opt-10" value="10">10초</option>
+          </select>
+          <select id="viewSel" class="px-3 py-2 rounded-xl" style="background:#eef2ff;border:1px solid #cbd5e1">
+            <option value="chart" id="opt-chart">차트</option>
+            <option value="digits" id="opt-digits">디지트</option>
+            <option value="table" id="opt-table">표</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 설정 카드 -->
+      <div class="rounded-2xl p-4 space-y-2" style="border:1px solid #cbd5e1; background:#fff;">
+        <label class="text-[12px] block mb-1"><span id="txt-mobius">Mobius Base URL</span>
+          <input id="baseUrl" class="w-full px-3 py-2 rounded-xl" style="background:#eef2ff;border:1px solid #cbd5e1;color:#0f172a" value="http://192.168.0.2:8080"/>
+        </label>
+        <div class="text-[12px] text-slate-500" id="txt-live-note">※ 라이브 모드에서만 주기(10/30/60초)가 적용됩니다.</div>
+        <div class="flex items-center justify-end gap-2">
+          <button id="apply" class="px-3 py-2 rounded-xl text-white" style="background:#10b981;"><b id="txt-apply">적용</b></button>
+        </div>
+      </div>
+
+      <!-- 토양 상태 배너 -->
+      <div id="soil-banner"
+           class="rounded-2xl p-3 md:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2"
+           style="border:1px solid #cbd5e1;background:#fff;">
+        <div class="text-sm">
+          <b id="txt-soil-state">토양 상태:</b>
+          <span id="soil-state-text">—</span>
+          <span id="soil-state-emoji" style="margin-left:4px;">🌱</span>
+        </div>
+        <div class="text-xs text-slate-500">
+          <span id="soil-state-pct">—%</span>
+          <span class="mx-1">·</span>
+          <span id="soil-state-ts">—</span>
+        </div>
+      </div>
+
+      <!-- ===== 보기: 차트 패널 ===== -->
+      <div id="panel-charts" class="grid grid-cols-1 gap-4">
+        <!-- 온도 -->
+        <section class="rounded-2xl p-4 card-cq" style="border:1px solid #cbd5e1; background:#fff;">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold text-base sm:text-lg" id="h-temp">온도</h3>
+            <span class="text-xs" id="ts-temp" style="color:#64748b">업데이트 대기</span>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="tile"><div class="tile-k" id="t-cur-1">현재</div><div id="cur-temp" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-min-1">최소</div><div id="min-temp" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-max-1">최대</div><div id="max-temp" class="tile-v">—</div></div>
+          </div>
+          <div class="h-44 sm:h-56 md:h-64 lg:h-72 xl:h-80"><canvas id="cv-temp"></canvas></div>
+        </section>
+
+        <!-- 습도 -->
+        <section class="rounded-2xl p-4 card-cq" style="border:1px solid #cbd5e1; background:#fff;">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold text-base sm:text-lg" id="h-humi">습도</h3>
+            <span class="text-xs" id="ts-humi" style="color:#64748b">업데이트 대기</span>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="tile"><div class="tile-k" id="t-cur-2">현재</div><div id="cur-humi" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-min-2">최소</div><div id="min-humi" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-max-2">최대</div><div id="max-humi" class="tile-v">—</div></div>
+          </div>
+          <div class="h-44 sm:h-56 md:h-64 lg:h-72 xl:h-80"><canvas id="cv-humi"></canvas></div>
+        </section>
+
+        <!-- 조도 -->
+        <section class="rounded-2xl p-4 card-cq" style="border:1px solid #cbd5e1; background:#fff;">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold text-base sm:text-lg" id="h-lux">조도</h3>
+            <span class="text-xs" id="ts-lux" style="color:#64748b">업데이트 대기</span>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="tile"><div class="tile-k" id="t-cur-3">현재</div><div id="cur-lux" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-min-3">최소</div><div id="min-lux" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-max-3">최대</div><div id="max-lux" class="tile-v">—</div></div>
+          </div>
+          <div class="h-44 sm:h-56 md:h-64 lg:h-72 xl:h-80"><canvas id="cv-lux"></canvas></div>
+        </section>
+
+        <!-- CO₂ -->
+        <section class="rounded-2xl p-4 card-cq" style="border:1px solid #cbd5e1; background:#fff;">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold text-base sm:text-lg" id="h-co2">CO₂</h3>
+            <span class="text-xs" id="ts-co2" style="color:#64748b">업데이트 대기</span>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="tile"><div class="tile-k" id="t-cur-4">현재</div><div id="cur-co2" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-min-4">최소</div><div id="min-co2" class="tile-v">—</div></div>
+            <div class="tile"><div class="tile-k" id="t-max-4">최대</div><div id="max-co2" class="tile-v">—</div></div>
+          </div>
+          <div class="h-44 sm:h-56 md:h-64 lg:h-72 xl:h-80"><canvas id="cv-co2"></canvas></div>
+        </section>
+      </div>
+
+      <!-- ===== 보기: 디지트 패널 ===== -->
+      <section id="panel-digits" class="rounded-2xl p-4 hidden" style="border:1px solid #cbd5e1; background:#fff;">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 digits-cq">
+          <div class="tile flex flex-col gap-1">
+            <div class="tile-k" id="d-l-temp">온도</div>
+            <div class="digit"><span id="dig-temp">—</span><span class="digit-unit">°C</span></div>
+            <div class="k-mini" id="digts-temp">—</div>
+          </div>
+          <div class="tile flex flex-col gap-1">
+            <div class="tile-k" id="d-l-humi">습도</div>
+            <div class="digit"><span id="dig-humi">—</span><span class="digit-unit">%</span></div>
+            <div class="k-mini" id="digts-humi">—</div>
+          </div>
+          <div class="tile flex flex-col gap-1">
+            <div class="tile-k" id="d-l-lux">조도</div>
+            <div class="digit"><span id="dig-lux">—</span><span class="digit-unit">lux</span></div>
+            <div class="k-mini" id="digts-lux">—</div>
+          </div>
+          <div class="tile flex flex-col gap-1">
+            <div class="tile-k" id="d-l-co2">CO₂</div>
+            <div class="digit"><span id="dig-co2">—</span><span class="digit-unit">ppm</span></div>
+            <div class="k-mini" id="digts-co2">—</div>
+          </div>
+          <div class="tile flex flex-col gap-1">
+            <div class="tile-k" id="d-l-soil">토양습도</div>
+            <div class="digit"><span id="dig-soil">—</span><span class="digit-unit">%</span></div>
+            <div><span id="digsoil-state" class="chip">—</span></div>
+            <div class="k-mini" id="digts-soil">—</div>
+          </div>
+        </div>
+        <div class="text-[12px] text-slate-500 mt-3" id="txt-digit-note">※ 디지트 보드는 라이브 모드에서 최신값만 표시합니다.</div>
+      </section>
+
+      <!-- ===== 보기: 표 패널 ===== -->
+      <section id="panel-table" class="rounded-2xl p-4 hidden" style="border:1px solid #cbd5e1; background:#fff;">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-500">
+                <th class="py-2 pr-3" id="th-item">항목</th>
+                <th class="py-2 pr-3" id="th-current">현재</th>
+                <th class="py-2 pr-3" id="th-unit">단위</th>
+                <th class="py-2 pr-3" id="th-state">상태</th>
+                <th class="py-2" id="th-upd">업데이트</th>
+              </tr>
+            </thead>
+            <tbody id="sum-tbody"></tbody>
+          </table>
+        </div>
+        <div class="text-[12px] text-slate-500 mt-3" id="txt-table-note">※ 표 보드도 라이브 모드에서 최신값만 집계합니다.</div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    /* ===== i18n ===== */
+    const I18N = {
+      ko: { title:"자동화 컨테이너팜", menu:"메뉴", navIntro:"Introduce", navProj:"Project",
+        heroTitle:"컨테이너팜", heroSub:"센서 기반 환경 모니터링 · 자동 제어 시스템",
+        introDesc:"좌측 상단의 메뉴에서 <b>Project</b>를 누르면 실시간 센서 데이터를 확인할 수 있습니다.",
+        openDash:"실시간 대시보드 열기",
+        start:"시작", stop:"중지", sec:"초",
+        chart:"차트", digits:"디지트", table:"표",
+        mobius:"Mobius Base URL", liveNote:"※ 라이브 모드에서만 주기(10/30/60초)가 적용됩니다.", apply:"적용",
+        soilStateLabel:"토양 상태:",
+        wait:"대기", online:"온라인", offline:"오프라인", updated:"업데이트",
+        current:"현재", min:"최소", max:"최대",
+        temp:"온도", humi:"습도", lux:"조도", co2:"CO₂", soil:"토양습도",
+        digitNote:"※ 디지트 보드는 라이브 모드에서 최신값만 표시합니다.",
+        tableHeadItem:"항목", tableHeadCur:"현재", tableHeadUnit:"단위", tableHeadState:"상태", tableHeadUpd:"업데이트",
+        tableNote:"※ 표 보드도 라이브 모드에서 최신값만 집계합니다.",
+        soilBuckets:{ veryWet:"매우 습함", wet:"습함", dry:"건조", veryDry:"매우 건조" },
+        locale:"ko-KR"
+      },
+      en: { title:"Automated Container Farm", menu:"Menu", navIntro:"Introduce", navProj:"Project",
+        heroTitle:"Container Farm", heroSub:"Sensor-based monitoring & automatic control",
+        introDesc:'Open <b>Project</b> from the top-left menu to see live sensor data.',
+        openDash:"Open Live Dashboard",
+        start:"Start", stop:"Stop", sec:"s",
+        chart:"Chart", digits:"Digits", table:"Table",
+        mobius:"Mobius Base URL", liveNote:"※ Polling interval (10/30/60s) applies only in Live mode.", apply:"Apply",
+        soilStateLabel:"Soil status:",
+        wait:"Idle", online:"Online", offline:"Offline", updated:"Updated",
+        current:"Now", min:"Min", max:"Max",
+        temp:"Temperature", humi:"Humidity", lux:"Illuminance", co2:"CO₂", soil:"Soil Moisture",
+        digitNote:"※ Digits board shows only the latest value in Live mode.",
+        tableHeadItem:"Item", tableHeadCur:"Current", tableHeadUnit:"Unit", tableHeadState:"State", tableHeadUpd:"Updated",
+        tableNote:"※ Table board also aggregates only the latest values in Live mode.",
+        soilBuckets:{ veryWet:"Very Wet", wet:"Wet", dry:"Dry", veryDry:"Very Dry" },
+        locale:"en-US"
+      },
+      ja: { title:"自動化コンテナファーム", menu:"メニュー", navIntro:"Introduce", navProj:"Project",
+        heroTitle:"コンテナファーム", heroSub:"センサー連動の監視・自動制御システム",
+        introDesc:"左上のメニューから<b>Project</b>を開くと、ライブのセンサーデータを見られます。",
+        openDash:"ライブダッシュボードを開く",
+        start:"開始", stop:"停止", sec:"秒",
+        chart:"チャート", digits:"デジット", table:"表",
+        mobius:"Mobius ベースURL", liveNote:"※ ポーリング間隔(10/30/60秒)はライブ時のみ適用されます。", apply:"適用",
+        soilStateLabel:"土壌状態：",
+        wait:"待機", online:"オンライン", offline:"オフライン", updated:"更新",
+        current:"現在", min:"最小", max:"最大",
+        temp:"温度", humi:"湿度", lux:"照度", co2:"CO₂", soil:"土壌湿度",
+        digitNote:"※ デジット板はライブ時のみ最新値を表示します。",
+        tableHeadItem:"項目", tableHeadCur:"現在", tableHeadUnit:"単位", tableHeadState:"状態", tableHeadUpd:"更新",
+        tableNote:"※ 表もライブ時のみ最新値を集計します。",
+        soilBuckets:{ veryWet:"とても湿っている", wet:"湿っている", dry:"乾燥", veryDry:"とても乾燥" },
+        locale:"ja-JP"
+      }
+    };
+    let LANG = 'ko';
+    const byId = (id)=>document.getElementById(id);
+
+    function applyI18n(){
+      const t = I18N[LANG];
+      document.title = t.title;
+      byId('txt-title').textContent = t.title;
+      byId('txt-menu').textContent = t.menu;
+      byId('txt-nav-intro').textContent = t.navIntro;
+      byId('txt-nav-proj').textContent = t.navProj;
+      byId('txt-hero-title').textContent = t.heroTitle;
+      byId('txt-hero-sub').textContent = t.heroSub;
+      byId('txt-intro-desc').innerHTML = t.introDesc;
+      byId('btn-open-dashboard').textContent = t.openDash;
+      byId('txt-start').textContent = t.start;
+      byId('txt-stop').textContent  = t.stop;
+
+      // 옵션 라벨(표준 방식)
+      byId('opt-3').textContent = '3' + t.sec;
+      byId('opt-5').textContent = '5' + t.sec;
+      byId('opt-10').textContent = '10' + t.sec;
+
+      byId('opt-chart').textContent  = t.chart;
+      byId('opt-digits').textContent = t.digits;
+      byId('opt-table').textContent  = t.table;
+      byId('txt-mobius').textContent = t.mobius;
+      byId('txt-live-note').textContent = t.liveNote;
+      byId('txt-apply').textContent = t.apply;
+      byId('txt-soil-state').textContent = t.soilStateLabel;
+
+      byId('h-temp').textContent = t.temp;
+      byId('h-humi').textContent = t.humi;
+      byId('h-lux').textContent  = t.lux;
+      byId('h-co2').textContent  = t.co2;
+      ['t-cur-1','t-cur-2','t-cur-3','t-cur-4'].forEach(id=>byId(id).textContent=t.current);
+      ['t-min-1','t-min-2','t-min-3','t-min-4'].forEach(id=>byId(id).textContent=t.min);
+      ['t-max-1','t-max-2','t-max-3','t-max-4'].forEach(id=>byId(id).textContent=t.max);
+
+      byId('d-l-temp').textContent = t.temp;
+      byId('d-l-humi').textContent = t.humi;
+      byId('d-l-lux').textContent  = t.lux;
+      byId('d-l-co2').textContent  = t.co2;
+      byId('d-l-soil').textContent = t.soil;
+
+      byId('txt-digit-note').textContent = t.digitNote;
+      byId('th-item').textContent   = t.tableHeadItem;
+      byId('th-current').textContent= t.tableHeadCur;
+      byId('th-unit').textContent   = t.tableHeadUnit;
+      byId('th-state').textContent  = t.tableHeadState;
+      byId('th-upd').textContent    = t.tableHeadUpd;
+      byId('txt-table-note').textContent = t.tableNote;
+
+      setPillState(PILL_STATE);
+      const labelByKey = {temp:t.temp,humi:t.humi,lux:t.lux,co2:t.co2};
+      for (const k of Object.keys(charts)){
+        if (charts[k]?.data?.datasets?.[0]){
+          charts[k].data.datasets[0].label = labelByKey[k] || charts[k].data.datasets[0].label;
+          charts[k].update('none');
+        }
+      }
+      refreshAllRenderedTimestamps();
+      refreshSoilTexts();
+      document.documentElement.lang = t.locale.startsWith('ko')?'ko':t.locale.startsWith('ja')?'ja':'en';
+    }
+    function setLang(l){
+      LANG = (l in I18N) ? l : 'ko';
+      localStorage.setItem('greenvision.lang', LANG);
+      applyI18n();
+    }
+
+    /* ===== 설정 ===== */
+    const ORIGIN = 'SOrigin', RVI = '3';
+    const RESOURCES = [
+      { key:'temp', labelKey:'temp', unit:'°C',  dp:1, path:'/Mobius/raspi/temp/la' },
+      { key:'humi', labelKey:'humi', unit:'%',   dp:1, path:'/Mobius/raspi/humi/la' },
+      { key:'lux',  labelKey:'lux',  unit:'lux', dp:0, path:'/Mobius/raspi/lux/la'  },
+      { key:'co2',  labelKey:'co2',  unit:'ppm', dp:0, path:'/Mobius/raspi/co2/la'  },
+      { key:'soil', labelKey:'soil', unit:'%',   dp:0, path:'/Mobius/raspi/soil_moisture/la', chart:false },
+    ];
+    const MAX_POINTS = 10;
+
+    /* Soil calibration: 3000(100%) ↔ 3800(0%) */
+    const SOIL_WET_ADC = 3000;
+    const SOIL_DRY_ADC = 3800;
+    const clamp = (n,a,b)=>Math.min(Math.max(n,a),b);
+    function adcToSoilPercent(raw){
+      if (raw==null || !isFinite(raw)) return null;
+      const r = clamp(raw, 0, 4095);
+      const pct = (SOIL_DRY_ADC - r) / (SOIL_DRY_ADC - SOIL_WET_ADC) * 100;
+      return clamp(Math.round(pct), 0, 100);
+    }
+    function percentToAdc(pct){
+      if (pct==null || !isFinite(pct)) return null;
+      const p = clamp(pct,0,100)/100;
+      return Math.round(SOIL_DRY_ADC - p*(SOIL_DRY_ADC - SOIL_WET_ADC));
+    }
+    function soilBucketLabelFromAdc(adc){
+      if (adc==null) return null;
+      const b = I18N[LANG].soilBuckets;
+      if (adc<=3000) return b.veryWet;
+      if (adc<=3500) return b.wet;
+      if (adc<=3800) return b.dry;
+      return b.veryDry;
+    }
+    function soilEmoji(bucket){
+      const m = {
+        '매우 습함':'💧','Very Wet':'💧','とても湿っている':'💧',
+        '습함':'😊','Wet':'😊','湿っている':'😊',
+        '건조':'🔥','Dry':'🔥','乾燥':'🔥',
+        '매우 건조':'💀','Very Dry':'💀','とても乾燥':'💀'
+      };
+      return m[bucket] || '🌱';
+    }
+
+    /* ===== DOM ===== */
+    const menuBtn     = byId('menuBtn');
+    const logoBtn     = byId('logoBtn');
+    const sideMenu    = byId('sideMenu');
+    const closeMenu   = byId('closeMenu');
+    const backdrop    = byId('backdrop');
+    const pill        = byId('pill');
+    const viewIntro   = byId('view-introduce');
+    const viewProject = byId('view-project');
+    const baseUrlEl   = byId('baseUrl');
+    const applyBtn    = byId('apply');
+    const btnStart    = byId('btnStart');
+    const btnStop     = byId('btnStop');
+    const intervalSel = byId('intervalSel');
+    const viewSel     = byId('viewSel');
+    const langBtn  = byId('langBtn');
+    const langMenu = byId('langMenu');
+
+    // Soil banner
+    const soilBannerText  = byId('soil-state-text');
+    const soilBannerEmoji = byId('soil-state-emoji');
+    const soilBannerPct   = byId('soil-state-pct');
+    const soilBannerTs    = byId('soil-state-ts');
+
+    // 차트 카드
+    const card = {
+      temp:{ ts:byId('ts-temp'), cur:byId('cur-temp'), min:byId('min-temp'), max:byId('max-temp'), canvas:byId('cv-temp') },
+      humi:{ ts:byId('ts-humi'), cur:byId('cur-humi'), min:byId('min-humi'), max:byId('max-humi'), canvas:byId('cv-humi') },
+      lux :{ ts:byId('ts-lux'),  cur:byId('cur-lux'),  min:byId('min-lux'),  max:byId('max-lux'),  canvas:byId('cv-lux')  },
+      co2 :{ ts:byId('ts-co2'),  cur:byId('cur-co2'),  min:byId('min-co2'),  max:byId('max-co2'),  canvas:byId('cv-co2')  },
+    };
+
+    // 보드
+    const panelCharts = byId('panel-charts');
+    const panelDigits = byId('panel-digits');
+    const panelTable  = byId('panel-table');
+    const digitsEls = {
+      temp:{ v:byId('dig-temp'), ts:byId('digts-temp') },
+      humi:{ v:byId('dig-humi'), ts:byId('digts-humi') },
+      lux :{ v:byId('dig-lux'),  ts:byId('digts-lux')  },
+      co2 :{ v:byId('dig-co2'),  ts:byId('digts-co2')  },
+      soil:{ v:byId('dig-soil'), ts:byId('digts-soil'), state:byId('digsoil-state') },
+    };
+    const sumTbody = byId('sum-tbody');
+
+    /* ===== 상태 ===== */
+    let activeView = 'introduce';
+    let charts = {};
+    let values = { temp:[], humi:[], lux:[], co2:[] };
+    let sensorTimers = {};
+    let statusTimer  = null;
+    let successFlags = {};
+    let lastCurrent = { temp:null, humi:null, lux:null, co2:null, soil:null };
+    let lastSoilAdc = null;
+    let PILL_STATE = 'wait';
+
+    /* ===== 유틸 ===== */
+    const rid = (p='req') => `${p}-${Math.random().toString(36).slice(2)}`;
+    const safeJSON = (s) => { try { return JSON.parse(s); } catch { return null; } };
+    function locale(){ return I18N[LANG].locale || 'ko-KR'; }
+    const fmtNum = (v,dp=1) => (v==null||Number.isNaN(v)) ? '—' : String(Math.round(v*(10**dp))/(10**dp));
+    function fmtTime(ts){
+      const loc = locale();
+      try{
+        if (typeof ts==='number') return new Date(ts).toLocaleString(loc);
+        if (typeof ts==='string'){
+          if (/^\d{8}T\d{6}$/.test(ts)){
+            const y=ts.slice(0,4), M=ts.slice(4,6), d=ts.slice(6,8), H=ts.slice(9,11), m=ts.slice(11,13), s=ts.slice(13,15);
+            return new Date(`${y}-${M}-${d}T${H}:${m}:${s}`).toLocaleString(loc);
+          }
+          const d2 = new Date(ts); if (!isNaN(d2)) return d2.toLocaleString(loc);
+        }
+      }catch{}
+      return '—';
+    }
+    function refreshAllRenderedTimestamps(){
+      if (soilBannerTs.textContent && soilBannerTs.textContent!=='—' && lastCurrent.soil?.ts){
+        soilBannerTs.textContent = fmtTime(lastCurrent.soil.ts);
+      }
+      for (const k of Object.keys(lastCurrent)){
+        const cur = lastCurrent[k];
+        if (!cur?.ts) continue;
+        if (digitsEls[k]) digitsEls[k].ts.textContent = fmtTime(cur.ts);
+        const row = sumTbody?.querySelector(`tr[data-k="${k}"]`);
+        if (row) row.querySelector('[data-cell="ts"]').textContent = fmtTime(cur.ts);
+      }
+    }
+
+    async function fetchWithTimeout(url, options={}, ms=8000){
+      const ctrl = new AbortController(); const id = setTimeout(()=>ctrl.abort(), ms);
+      try { return await fetch(url, { ...options, signal: ctrl.signal }); }
+      finally { clearTimeout(id); }
+    }
+
+    /* ===== con 파서 ===== */
+    function parseValue(key, con){
+      if (con == null) return null;
+      const ranges = {
+        temp:{min:-50,max:80}, humi:{min:0,max:100},
+        lux:{min:0,max:200000}, co2:{min:0,max:10000},
+        soil:{min:0,max:100}
+      };
+      const inRange = (k,n) => { const r = ranges[k]; return typeof n==='number' && isFinite(n) && n>=r.min && n<=r.max; };
+      const grabAll = (s) => (s.replace(',', '.').match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/g)||[]).map(Number).filter(Number.isFinite);
+
+      if (typeof con === 'number') return con;
+
+      if (typeof con === 'string'){
+        const s = con.trim();
+        if ((s.startsWith('{')&&s.endsWith('}'))||(s.startsWith('[')&&s.endsWith(']'))){
+          const j = safeJSON(s); if (j!=null) return parseValue(key, j);
+        }
+        const unitRx = {
+          temp:/([-+]?\d*\.?\d+)\s*(?:°\s*C|℃|C\b)/i,
+          humi:/([-+]?\d*\.?\d+)\s*%/i,
+          lux:/([-+]?\d*\.?\d+)\s*lux\b/i,
+          co2:/([-+]?\d*\.?\d+)\s*ppm\b/i,
+          soil:/([-+]?\d*\.?\d+)\s*%/i
+        }[key];
+        if (unitRx){
+          const um = s.replace(',', '.').match(unitRx);
+          if (um){ const n = Number(um[1]); if (inRange(key,n)) return n; }
+        }
+        const nearRx = {
+          temp:/(temp(?:erature)?|온도)[^\d-+]*([-+]?\d*\.?\d+)/i,
+          humi:/(humi(?:dity)?|습도)[^\d-+]*([-+]?\d*\.?\d+)/i,
+          lux: /(lux|조도|light|illuminance)[^\d-+]*([-+]?\d*\.?\d+)/i,
+          co2: /(co2|co₂|ppm)[^\d-+]*([-+]?\d*\.?\d+)/i,
+          soil:/(soil(?:_?moisture)?|moisture|토양|토양습도)[^\d-+]*([-+]?\d*\.?\d+)/i
+        }[key];
+        if (nearRx){
+          const m = s.replace(',', '.').match(nearRx);
+          if (m){ const n = Number(m[2] ?? m[1]); if (inRange(key,n)) return n; }
+        }
+        const list = grabAll(s);
+        let cand = list.find(n => inRange(key,n));
+        if (key==='soil' && cand==null && list.length){
+          const n0 = list[0];
+          const pct = adcToSoilPercent(n0);
+          if (pct!=null) return pct;
+        }
+        return cand ?? null;
+      }
+
+      if (Array.isArray(con)){
+        for (const v of con){ const n = parseValue(key, v); if (typeof n==='number') return n; }
+        return null;
+      }
+
+      if (typeof con === 'object'){
+        const lower = {}; for (const k of Object.keys(con)) lower[k.toLowerCase()] = con[k];
+        if ('v' in lower){
+          if (key==='soil'){
+            const raw = Number(lower['v']); const pct = adcToSoilPercent(raw); if (pct!=null) return pct;
+          } else {
+            const n = parseValue(key, lower['v']); if (typeof n==='number' && inRange(key,n)) return n;
+          }
+        }
+        const pick = (names) => {
+          for (const name of names){
+            if (!(name in lower)) continue;
+            const n = parseValue(key, lower[name]); if (typeof n==='number' && inRange(key,n)) return n;
+          }
+          return null;
+        };
+        if (key==='soil'){
+          const raw2 = Number(lower['raw'] ?? lower['adc'] ?? lower['soil'] ?? lower['soil_moisture']);
+          if (!Number.isNaN(raw2)){ const pct = adcToSoilPercent(raw2); if (pct!=null) return pct; }
+        }
+        if (key==='temp'){ const n=pick(['temp','temperature','t','value']); if(n!=null) return n; }
+        if (key==='humi'){ const n=pick(['humi','humidity','rh','value']);  if(n!=null) return n; }
+        if (key==='lux'){  const n=pick(['lux','light','illuminance','value']); if(n!=null) return n; }
+        if (key==='co2'){  const n=pick(['co2','co₂','ppm','value']);       if(n!=null) return n; }
+        for (const v of Object.values(lower)){
+          const n = parseValue(key, v); if (typeof n==='number' && inRange(key,n)) return n;
+        }
+        return null;
+      }
+      return null;
+    }
+
+    function tryParseSoilAdc(con){
+      if (con==null) return null;
+      if (typeof con==='number') return con;
+      if (typeof con==='string'){
+        if (/[%]/.test(con)) return percentToAdc(Number((con.match(/[-+]?\d*\.?\d+/)||[])[0]));
+        const nums=(con.replace(',', '.').match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/g)||[]).map(Number).filter(Number.isFinite);
+        return nums.length? nums[0] : null;
+      }
+      if (typeof con==='object'){
+        const lower = {}; for (const k of Object.keys(con)) lower[k.toLowerCase()] = con[k];
+        return Number(lower['adc'] ?? lower['raw'] ?? lower['v'] ?? NaN);
+      }
+      return null;
+    }
+
+    /* ===== 디지트 자동 폰트 조절 ===== */
+    function autoFitDigit(el, text){
+      const s = String(text ?? '—').replace(/[^\d.\-]/g,''); const len = s.length || 1;
+      el.style.fontSize = (len<=4?'36px':len<=6?'32px':len<=8?'28px':'24px');
+    }
+
+    /* ===== 보조 UI ===== */
+    function updateDigit(k, v, ts, unit, dp){
+      if (!digitsEls[k]) return;
+      const txt = (v==null? '—' : fmtNum(v, dp));
+      digitsEls[k].v.textContent = txt; autoFitDigit(digitsEls[k].v, txt);
+      digitsEls[k].ts.textContent = fmtTime(ts);
+      if (k==='soil'){
+        const bucket = soilBucketLabelFromAdc((v==null)? null : (lastSoilAdc ?? percentToAdc(v)));
+        digitsEls[k].state.textContent = bucket ? `${bucket} ${soilEmoji(bucket)}` : '—';
+      }
+    }
+    function ensureTableBuilt(){
+      if (!sumTbody || sumTbody.dataset.built === '1') return;
+      const t = I18N[LANG];
+      sumTbody.innerHTML = RESOURCES.map(r => `
+        <tr data-k="${r.key}">
+          <td class="py-2 pr-3">${t[r.labelKey]}</td>
+          <td class="py-2 pr-3" data-cell="v">—</td>
+          <td class="py-2 pr-3">${r.unit}</td>
+          <td class="py-2 pr-3" data-cell="state">—</td>
+          <td class="py-2" data-cell="ts">—</td>
+        </tr>`).join('');
+      sumTbody.dataset.built = '1';
+    }
+    function updateTable(k, v, ts, dp){
+      ensureTableBuilt();
+      const row = sumTbody.querySelector(`tr[data-k="${k}"]`); if (!row) return;
+      row.querySelector('[data-cell="v"]').textContent  = (v==null? '—' : fmtNum(v, dp));
+      row.querySelector('[data-cell="ts"]').textContent = fmtTime(ts);
+      row.querySelector('[data-cell="state"]').textContent =
+        (k==='soil') ? (()=>{
+          const bucket = soilBucketLabelFromAdc((v==null)? null : (lastSoilAdc ?? percentToAdc(v)));
+          return bucket ? `${bucket} ${soilEmoji(bucket)}` : '—';
+        })() : '—';
+    }
+    function updateSoilBanner(pct, adc, ts){
+      const a = (adc!=null)? adc : percentToAdc(pct);
+      const bucket = soilBucketLabelFromAdc(a);
+      soilBannerText.textContent  = bucket ?? '—';
+      soilBannerEmoji.textContent = soilEmoji(bucket);
+      soilBannerPct.textContent   = (pct==null? '—%' : `${pct}%`);
+      soilBannerTs.textContent    = fmtTime(ts);
+    }
+    function refreshSoilTexts(){
+      const cur = lastCurrent.soil;
+      const bucket = soilBucketLabelFromAdc(lastSoilAdc ?? (cur?.v!=null ? percentToAdc(cur.v) : null));
+      if (bucket){
+        soilBannerText.textContent = bucket;
+        const chip = digitsEls.soil?.state;
+        if (chip) chip.textContent = `${bucket} ${soilEmoji(bucket)}`;
+        const row = sumTbody?.querySelector('tr[data-k="soil"] [data-cell="state"]');
+        if (row) row.textContent = `${bucket} ${soilEmoji(bucket)}`;
+      }
+    }
+
+    function setViewMode(mode){
+      panelCharts.classList.toggle('hidden', mode!=='chart');
+      panelDigits.classList.toggle('hidden', mode!=='digits');
+      panelTable .classList.toggle('hidden', mode!=='table');
+      if (mode==='digits' || mode==='table'){
+        RESOURCES.forEach(r=>{
+          const cur = lastCurrent[r.key]; const v = cur?.v ?? null, ts = cur?.ts ?? null;
+          if (mode==='digits') updateDigit(r.key, v, ts, r.unit, r.dp);
+          if (mode==='table')  updateTable(r.key, v, ts, r.dp);
+        });
+      }
+    }
+
+    /* ===== Drawer / 라우팅 ===== */
+    function openDrawer(){ sideMenu.classList.add('open'); backdrop.classList.remove('hidden'); document.body.style.overflow='hidden'; }
+    function closeDrawer(){ sideMenu.classList.remove('open'); backdrop.classList.add('hidden'); document.body.style.overflow=''; }
+    function show(v){
+      activeView = v;
+      if (v==='introduce'){ viewIntro.classList.remove('hidden'); viewProject.classList.add('hidden'); stopPolling(); setPillState('wait'); }
+      else { viewIntro.classList.add('hidden'); viewProject.classList.remove('hidden'); viewSel.value='chart'; setViewMode('chart'); startPolling(); }
+    }
+
+    /* ===== 차트 ===== */
+    function niceStep(min, max) {
+      const span = Math.max((max - min) || 1, 1e-6);
+      const rough = span / 4;
+      const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
+      const steps = [1, 2, 2.5, 5, 10].map(b => b * pow10);
+      return steps.find(s => span / s <= 6) || steps[steps.length - 1];
+    }
+    function ensureChart(k,m){
+      if (m.chart===false) return null;
+      if (charts[k]) return charts[k];
+      const t = I18N[LANG];
+      const ctx = card[k].canvas.getContext('2d');
+      charts[k] = new Chart(ctx,{
+        type:'line',
+        data:{ labels:[], datasets:[{
+          label:t[m.labelKey], data:[], tension:0, pointRadius:2, pointHoverRadius:5, borderWidth:2, fill:false
+        }]},
+        options:{ responsive:true, animation:false, maintainAspectRatio:false,
+          scales:{ x:{ ticks:{ maxTicksLimit:6 } }, y:{ beginAtZero:false, ticks:{ callback:(v)=>fmtNum(v,m.dp) } } },
+          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:c=>`${fmtNum(c.parsed.y,m.dp)} ${m.unit}` } } }
+        }
+      });
+      return charts[k];
+    }
+    function clearChartData(k){
+      const ch = charts[k]; if (!ch) return; ch.data.labels=[]; ch.data.datasets[0].data=[]; values[k]=[]; ch.update('none');
+    }
+    function pushPoint(k,m,v,ts=Date.now()){
+      if (m.chart===false) return;
+      const ch = charts[k]; if (!ch) return;
+      ch.data.labels.push(new Date(ts).toLocaleTimeString(locale()));
+      ch.data.datasets[0].data.push(v ?? null);
+      if (typeof v==='number') values[k].push(v);
+      while (ch.data.labels.length > MAX_POINTS) ch.data.labels.shift();
+      while (ch.data.datasets[0].data.length > MAX_POINTS) ch.data.datasets[0].data.shift();
+      while (values[k].length > MAX_POINTS) values[k].shift();
+      if (values[k].length){
+        const min=Math.min(...values[k]), max=Math.max(...values[k]);
+        ch.options.scales.y.ticks.stepSize = niceStep(min, max);
+        card[k].cur.textContent=`${fmtNum(v,m.dp)} ${m.unit}`;
+        card[k].min.textContent=`${fmtNum(min,m.dp)} ${m.unit}`;
+        card[k].max.textContent=`${fmtNum(max,m.dp)} ${m.unit}`;
+      }
+      ch.update('none');
+    }
+
+    /* ===== 네트워킹 (라이브) ===== */
+    const buildUrl = (p) => (baseUrlEl.value || '').replace(/\/$/,'') + p;
+    const baseHeaders = ()=>({ 'Accept':'application/json','X-M2M-Origin': ORIGIN,'X-M2M-RI': rid(),'X-M2M-RVI': RVI });
+
+    function legacyFetchOne(r){
+      const url = buildUrl(r.path);
+      return fetchWithTimeout(url, { method:'GET', headers: baseHeaders() }, 8000)
+        .then(res => { if(!res.ok) throw new Error('HTTP '+res.status); return res.json(); })
+        .then(d => {
+          const cin = d['m2m:cin'] || d['cin'] || d;
+          const ts  = cin?.ct || cin?.lt || Date.now();
+
+          if (r.key==='soil'){
+            const raw = tryParseSoilAdc(cin?.con);
+            lastSoilAdc = (raw!=null && isFinite(raw)) ? raw : null;
+          }
+
+          const v   = parseValue(r.key, cin?.con);
+          if (r.chart!==false){
+            ensureChart(r.key, r);
+            pushPoint(r.key, r, (typeof v==='number'? v : null), Date.now());
+            byId('ts-'+r.key).textContent = `${I18N[LANG].updated}: ` + fmtTime(ts);
+          }
+
+          successFlags[r.key] = true;
+
+          lastCurrent[r.key] = { v:(typeof v==='number'? v : null), ts };
+          if (!panelDigits.classList.contains('hidden')) updateDigit(r.key, lastCurrent[r.key].v, ts, r.unit, r.dp);
+          if (!panelTable .classList.contains('hidden')) updateTable(r.key, lastCurrent[r.key].v, ts, r.dp);
+          if (r.key==='soil'){
+            const pct = (typeof v==='number') ? Math.round(v) : null;
+            updateSoilBanner(pct, lastSoilAdc, ts);
+          }
+        })
+        .catch(() => {
+          if (r.chart!==false){
+            ensureChart(r.key, r); pushPoint(r.key, r, null, Date.now()); byId('ts-'+r.key).textContent = 'Error';
+          }
+          successFlags[r.key] = false;
+
+          lastCurrent[r.key] = { v:null, ts:null };
+          if (!panelDigits.classList.contains('hidden')) updateDigit(r.key, null, null, r.unit, r.dp);
+          if (!panelTable .classList.contains('hidden')) updateTable(r.key, null, null, r.dp);
+          if (r.key==='soil'){ lastSoilAdc = null; updateSoilBanner(null, null, null); }
+        });
+    }
+
+    /* ===== 라이브 폴링 ===== */
+    function setPillState(state){
+      PILL_STATE = state;
+      const t = I18N[LANG];
+      if (state==='online'){ pill.textContent=t.online; pill.style.background='#10b981'; pill.style.color='#fff'; }
+      else if (state==='offline'){ pill.textContent=t.offline; pill.style.background='#ef4444'; pill.style.color='#fff'; }
+      else { pill.textContent=t.wait; pill.style.background='#d7deee'; pill.style.color='#0f172a'; }
+    }
+    function startPolling(){
+      stopPolling();
+      successFlags = {}; lastCurrent = { temp:null, humi:null, lux:null, co2:null, soil:null }; lastSoilAdc = null; setPillState('wait');
+      const intervalMs = Number(intervalSel.value) * 1000;
+      RESOURCES.forEach(r => { if (r.chart!==false) ensureChart(r.key, r); legacyFetchOne(r); sensorTimers[r.key] = setInterval(() => legacyFetchOne(r), intervalMs); });
+      statusTimer = setInterval(() => {
+        const anyOk = RESOURCES.some(r => successFlags[r.key]);
+        setPillState(anyOk ? 'online' : 'offline');
+        RESOURCES.forEach(r => { successFlags[r.key] = false; });
+      }, Math.max(1500, intervalMs + 100));
+    }
+    function stopPolling(){
+      Object.values(sensorTimers).forEach(id => clearInterval(id));
+      sensorTimers = {}; if (statusTimer) clearInterval(statusTimer); statusTimer=null; setPillState('wait');
+    }
+
+    /* ===== 이벤트 & 초기화 ===== */
+    function setViewAndRefresh(){ setViewMode(viewSel.value); }
+
+    // ✅ 드로어 토글 버그 수정
+    menuBtn.addEventListener('click', () =>
+      sideMenu.classList.contains('open') ? closeDrawer() : openDrawer()
+    );
+    closeMenu.addEventListener('click', closeDrawer);
+    backdrop.addEventListener('click', closeDrawer);
+    document.querySelectorAll('.menu-link').forEach(b => b.addEventListener('click', () => { show(b.dataset.target); closeDrawer(); }));
+    logoBtn.addEventListener('click', () => show('introduce'));
+
+    applyBtn.addEventListener('click', () => {
+      localStorage.setItem('greenvision.settings', JSON.stringify({
+        baseUrl: baseUrlEl.value, intervalSec: Number(intervalSel.value)||10, lang: LANG
+      }));
+      if (activeView==='project') startPolling();
+    });
+
+    btnStart.addEventListener('click', () => { viewSel.value='chart'; setViewAndRefresh(); startPolling(); });
+    btnStop .addEventListener('click', () => stopPolling());
+    intervalSel.addEventListener('change', () => startPolling());
+    viewSel    .addEventListener('change', setViewAndRefresh);
+
+    // 언어 메뉴
+    langBtn.addEventListener('click', () => { langMenu.classList.toggle('open'); });
+    document.addEventListener('click', (e)=>{ if (!langMenu.contains(e.target) && e.target!==langBtn) langMenu.classList.remove('open'); });
+    langMenu.querySelectorAll('.lang-item').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ setLang(btn.dataset.lang); langMenu.classList.remove('open'); });
+    });
+
+    (function init(){
+      const s = (()=>{ try{return JSON.parse(localStorage.getItem('greenvision.settings')||'{}');}catch{return{}} })();
+      if (s.baseUrl) baseUrlEl.value = s.baseUrl;
+      if (s.intervalSec && ['10','30','60'].includes(String(s.intervalSec))) intervalSel.value = String(s.intervalSec);
+      LANG = s.lang || localStorage.getItem('greenvision.lang') || (navigator.language||'ko').slice(0,2);
+      if (!(LANG in I18N)) LANG = 'ko';
+      applyI18n();
+      show('introduce');
+    })();
+  </script>
+</body>
+</html>

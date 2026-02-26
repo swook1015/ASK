@@ -1,8 +1,8 @@
 /**
  * RISK-WATCH AI: 통합 제어 스크립트 
- * 1. 시간 형식: 00:00:00 (엄격한 24시간제)
+ * 1. 서버 연동: 192.168.0.2:8080 (Mobius)
  * 2. 상태 구성: Level 1(정상), Level 3(위험)
- * 3. 긴급 신고 활성화: 위험 감지 시 30초간 유지
+ * 3. 기능: 서버 데이터(camId, v, t) 기반 UI 갱신 및 로그 저장
  */
 
 /* 1. 글로벌 변수 설정 */
@@ -10,15 +10,18 @@ let currentPage = 1;
 const rowsPerPage = 10;
 let selectedFilterDate = ""; 
 let emergencyActiveTimer = null; // 긴급 버튼 타이머 관리 변수
+let lastEventTime = null;       // 중복 데이터 처리 방지 변수 (이벤트 시간 t 기준)
 
 /* 2. 초기 로드 및 이벤트 리스너 */
 document.addEventListener('DOMContentLoaded', () => {
     initSidebar();
     initWebcam();
     
+    // 대시보드 요소가 있을 경우에만 폴링 및 로그 렌더링 시작
     if (document.getElementById('status-card')) {
         renderDashboardMiniLogs();
-        startDashboardSimulation();
+        // 실제 Mobius 서버 데이터 폴링 시작
+        startMobiusPolling();
     }
 
     if (document.getElementById('history-body')) {
@@ -60,21 +63,28 @@ function initSidebar() {
     }
 }
 
-/* 4. 웹캠 연동 */
+/* 4. 서버 연동 액션캠 스트리밍 */
 function initWebcam() {
-    const video = document.getElementById('webcam');
-    if (!video) return;
-    video.setAttribute('playsinline', '');
-    video.setAttribute('muted', '');
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
-        .then(stream => { video.srcObject = stream; video.play(); })
-        .catch(err => console.error("Webcam Error: ", err));
+    const webcamElement = document.getElementById('webcam');
+    if (!webcamElement) return;
+
+    // 실제 스트리밍 엔드포인트 주소
+    const actionCamStreamUrl = "http://192.168.0.2:8080/video_feed"; 
+
+    if (webcamElement.tagName.toLowerCase() === 'video') {
+        webcamElement.src = actionCamStreamUrl;
+        webcamElement.setAttribute('playsinline', '');
+        webcamElement.setAttribute('muted', '');
+        webcamElement.play().catch(err => {
+            console.error("액션캠 영상 재생 실패:", err);
+        });
+    } else if (webcamElement.tagName.toLowerCase() === 'img') {
+        webcamElement.src = actionCamStreamUrl;
     }
 }
 
-/* 5. 실시간 대시보드 로직 (30초 타이머 로직 포함) */
-function updateDashboardUI(level) {
+/* 5. 실시간 대시보드 로직 (서버 데이터 기반 반영) */
+function updateDashboardUI(level, camId, eventTimeStr) {
     const statusCard = document.getElementById('status-card');
     const statusText = document.getElementById('status-text');
     const emergencyBox = document.getElementById('emergency-actions');
@@ -82,48 +92,46 @@ function updateDashboardUI(level) {
 
     if (!statusCard) return;
 
-    lastUpdate.innerText = getFormattedTime(new Date());
+    // 서버에서 보내준 이벤트 발생 시간(t)을 Date 객체로 변환
+    const serverDateObj = new Date(eventTimeStr);
+    lastUpdate.innerText = getFormattedTime(serverDateObj);
 
     const config = {
         1: { type: "정상", cls: "status-normal", tag: "info" },
         3: { type: "위험", cls: "status-danger", tag: "danger" }
     };
     
-    const current = config[level];
+    const current = config[level] || config[1];
 
     if (level === 1) {
-        // [정상 상태]
-        statusCard.className = current.cls;
-        statusText.innerText = "감지 중";
+        statusCard.className = `status-card ${current.cls}`;
+        statusText.innerText = `[CAM ${camId}] 감지 중`; 
         
-        // 현재 활성화된 30초 타이머가 없을 때만 버튼을 비활성화 함
         if (emergencyBox && !emergencyActiveTimer) {
             emergencyBox.className = "emergency-box disabled";
         }
     } else {
-        // [위험 상태 (Level 3)]
-        statusCard.className = current.cls;
-        statusText.innerText = current.type + " 상태";
+        statusCard.className = `status-card ${current.cls}`;
+        statusText.innerText = `[CAM ${camId}] ${current.type} 상태`; 
         
         if (emergencyBox) {
             emergencyBox.className = "emergency-box active";
             
-            // 기존에 돌아가던 타이머가 있다면 취소하고 새로 30초 시작 (중첩 방지)
+            // 위험 상황 시 30초간 알림 활성화 후 자동 비활성화
             if (emergencyActiveTimer) {
                 clearTimeout(emergencyActiveTimer);
             }
             
-            // 30초(30000ms) 후에 버튼을 다시 비활성화 상태로 돌림
             emergencyActiveTimer = setTimeout(() => {
                 emergencyBox.className = "emergency-box disabled";
-                emergencyActiveTimer = null; // 타이머 종료 알림
-                console.log("30초 경과: 긴급 신고 버튼이 비활성화되었습니다.");
+                emergencyActiveTimer = null; 
             }, 30000);
         }
-        
-        saveLogToStorage(level, current.type, `${current.type} 상황이 감지됨`, current.tag);
-        renderDashboardMiniLogs();
     }
+    
+    const logMessage = `[카메라 ${camId}] ${current.type} 상황 감지`;
+    saveLogToStorage(level, current.type, logMessage, current.tag, serverDateObj);
+    renderDashboardMiniLogs();
 }
 
 function renderDashboardMiniLogs() {
@@ -139,20 +147,23 @@ function renderDashboardMiniLogs() {
 }
 
 /* 6. 데이터 저장 */
-function saveLogToStorage(level, type, message, className) {
+function saveLogToStorage(level, type, message, className, serverDateObj) {
     try {
         const logs = JSON.parse(localStorage.getItem('risk_logs')) || [];
-        const now = new Date();
+        
         const newLog = {
             id: Date.now(),
             level: level,
-            isoDate: now.toISOString().split('T')[0], 
-            hour: now.getHours(),
-            date: now.toLocaleDateString(),
-            time: getFormattedTime(now),
-            type, message, className
+            isoDate: serverDateObj.toISOString().split('T')[0], 
+            hour: serverDateObj.getHours(),
+            date: serverDateObj.toLocaleDateString(),
+            time: getFormattedTime(serverDateObj),
+            type, 
+            message,
+            className
         };
         logs.unshift(newLog);
+        // 최대 500개까지만 로그 저장
         localStorage.setItem('risk_logs', JSON.stringify(logs.slice(0, 500)));
     } catch (e) { console.error(e); }
 }
@@ -280,10 +291,76 @@ function updatePaginationUI(totalPages) {
     container.appendChild(nextBtn);
 }
 
-function startDashboardSimulation() {
-    setInterval(() => {
-        const rand = Math.random();
-        const level = rand > 0.90 ? 3 : 1; 
-        updateDashboardUI(level);
-    }, 5000);
+/* 9. [Mobius 서버 연동] 192.168.0.2:8080 데이터 수신 로직 */
+async function fetchMobiusData() {
+    try {
+        const raspIp = "192.168.0.2"; 
+        const port = "7579";
+        const url = `http://${raspIp}:${port}/Mobius/KETI3_DEMO/fall_state/la`;
+        
+        const headers = {
+            // 매번 새로운 요청 ID를 생성하여 "RI is none" 에러 방지
+            'X-M2M-RI': 'req-' + Date.now(), 
+            // Mobius AE 설정과 일치해야 함
+            'X-M2M-Origin': 'SKETI3_DEMO', 
+            'Accept': 'application/json'
+        };
+
+        const response = await fetch(url, { 
+            method: 'GET', 
+            headers: headers,
+            mode: 'cors' 
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Mobius 서버 응답 에러: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // 데이터가 없는 경우 예외 처리
+        if (!data['m2m:cin']) {
+            console.warn("표시할 최신 데이터(cin)가 없습니다.");
+            return;
+        }
+
+        let content = data['m2m:cin'].con;
+        
+        // con 데이터가 문자열 형태일 경우 JSON 파싱
+        if (typeof content === 'string') {
+            try {
+                content = JSON.parse(content);
+            } catch(e) {
+                console.error("JSON 파싱 에러:", e);
+            }
+        }
+        
+        // 서버 데이터 구조 매핑 (camId, t, v)
+        const camId = content.camId || "0";
+        const eventTime = content.t; 
+        const statusValue = content.v; 
+        
+        // v 값이 'fall'이면 Level 3, 아니면 Level 1
+        let level = (statusValue === 'fall') ? 3 : 1;
+
+        // 동일한 이벤트 시간에 대한 중복 처리 방지
+        if (lastEventTime !== eventTime) {
+            lastEventTime = eventTime; 
+            updateDashboardUI(level, camId, eventTime);
+            
+            if (level === 3) {
+                console.log(`🚨 [위험 감지] 카메라: ${camId} | 시간: ${eventTime}`);
+            }
+        }
+
+    } catch (error) {
+        console.error("데이터 수신 실패:", error);
+    }
+}
+
+/** 2초 주기로 Mobius 서버 데이터를 확인하는 폴링 함수 */
+function startMobiusPolling() {
+    // 즉시 한 번 호출 후 인터벌 시작
+    fetchMobiusData(); 
+    setInterval(fetchMobiusData, 2000); 
 }
