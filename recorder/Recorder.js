@@ -86,18 +86,26 @@ export class Recorder {
     }
 
     spawnSegmenter() {
-        const outPattern = path.join(this.ringBase(), "%Y%m%d", "%H", "%Y%m%d_%H%M%S_%s.mp4");
         const size = `${this.width}x${this.height}`;
+
+        const outPattern =
+            process.platform === "win32"
+                ? path.join(this.ringBase(), "%Y%m%d_%H%M%S.mp4")
+                : path.join(this.ringBase(), "%Y%m%d", "%H", "%Y%m%d_%H%M%S_%s.mp4");
 
         const inputArgs =
             process.platform === "win32"
-                ? ["-f", "dshow", "-video_size", size, "-framerate", String(this.fps), "-i", this.devicePath]
+                ? [
+                    "-f", "dshow",
+                    "-video_size", size,
+                    "-framerate", String(this.fps),
+                    "-i", this.devicePath,
+                ]
                 : ["-f", "v4l2", "-framerate", String(this.fps), "-video_size", size, "-i", this.devicePath];
 
         const args = [
             "-hide_banner",
             "-loglevel", "warning",
-
             ...inputArgs,
 
             "-c:v", "libx264",
@@ -106,6 +114,7 @@ export class Recorder {
             "-g", String(this.fps * 2),
             "-keyint_min", String(this.fps * 2),
             "-sc_threshold", "0",
+            "-pix_fmt", "yuv420p",
 
             "-f", "segment",
             "-segment_time", "2",
@@ -120,14 +129,21 @@ export class Recorder {
 
     async onSegmentAdded(file) {
         if (!file.endsWith(".mp4")) return;
+
         const name = path.basename(file);
         const epochSec = parseEpochSecFromName(name);
-        if (!epochSec) return;
 
-        const startMs = epochSec * 1000;
+        let startMs;
+        if (epochSec) {
+            startMs = epochSec * 1000;
+        } else {
+            const st = await fs.stat(file).catch(() => null);
+            if (!st) return;
+            startMs = st.mtimeMs;
+        }
+
         this.index.push({ startMs, file });
 
-        // 인덱스 정리(2시간+여유)
         const cutoff = Date.now() - (KEEP_RING_MS + 60_000);
         while (this.index.length && this.index[0].startMs < cutoff) this.index.shift();
     }
