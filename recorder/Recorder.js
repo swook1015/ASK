@@ -91,7 +91,7 @@ export class Recorder {
         // ✅ Windows: strftime 쓰지 말고 숫자 인덱스 세그먼트로 저장(가장 안정)
         const outPattern =
             process.platform === "win32"
-                ? path.join(this.ringBase(), "seg%06d.mp4")
+                ? path.join(this.ringBase(), "seg_%06d.mp4")
                 : path.join(this.ringBase(), "%Y%m%d", "%H", "%Y%m%d%H%M%S_%s.mp4");
 
         const inputArgs =
@@ -122,16 +122,25 @@ export class Recorder {
             outPattern,
         ];
 
-        return spawnFfmpeg(args, { name: 'ffmpeg-seg-${this.camId}'});
+        return spawnFfmpeg(args, { name: `ffmpeg-seg-${this.camId}` });
     }
 
     async onSegmentAdded(file) {
         if (!file.endsWith(".mp4")) return;
+
         const name = path.basename(file);
         const epochSec = parseEpochSecFromName(name);
-        if (!epochSec) return;
 
-        const startMs = epochSec * 1000;
+        let startMs;
+        if (epochSec) {
+            startMs = epochSec * 1000;
+        } else {
+            // ✅ seg_000001.mp4 같은 번호 파일이면 수정시간으로 타임라인 구성
+            const st = await fs.stat(file).catch(() => null);
+            if (!st) return;
+            startMs = st.mtimeMs;
+        }
+
         this.index.push({ startMs, file });
 
         // 인덱스 정리(2시간+여유)
@@ -180,12 +189,22 @@ export class Recorder {
         const copied = [];
         for (const s of segs) {
             const dst = path.join(outDir, path.basename(s.file));
-            await fs.copyFile(s.file, dst).catch(() => {});
-            copied.push(dst);
+            try {
+                await fs.copyFile(s.file, dst);
+                copied.push(dst);
+            } catch {}
+        }
+        if (copied.length === 0) {
+            console.log(`[Recorder:${this.camId}] copied segments = 0`);
+            return;
         }
 
         // concat 리스트 작성
-        copied.sort(); // 파일명에 시간이 있으면 정렬로 순서 맞음
+        copied.sort((a, b) => {
+            const na = Number(path.basename(a).match(/(\d+)\.mp4$/)?.[1] ?? 0);
+            const nb = Number(path.basename(b).match(/(\d+)\.mp4$/)?.[1] ?? 0);
+            return na - nb;
+        });
         const listPath = path.join(outDir, "list.txt");
         const listBody = copied.map(f => `file '${f.replace(/'/g, "'\\''")}'`).join("\n");
         await fs.writeFile(listPath, listBody, "utf8");
