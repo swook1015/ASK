@@ -1,6 +1,10 @@
 import path from "path";
 
-export const BASE_DIR = path.join(process.cwd(), "recordings");
+export const BASE_DIR =
+    process.platform === "win32"
+        ? path.join(process.cwd(), "recordings")
+        : "/var/recordings";
+
 export const RING_DIR = path.join(BASE_DIR, "ring");
 export const ARCHIVE_DIR = path.join(BASE_DIR, "archive");
 

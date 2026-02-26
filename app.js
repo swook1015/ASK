@@ -14,12 +14,13 @@
 const conf = require("./conf");
 const { RecorderManager } = require("./recorder/RecorderManager");
 const { discoverCameras } = require("./recorder/discoverCameras");
+console.log("cwd:", process.cwd());
 
 const cameras =
     (conf.cameras && Object.keys(conf.cameras).length > 0)
         ? conf.cameras
         : discoverCameras();
-
+console.log("[cameras]", cameras);
 global.recorderManager = new RecorderManager(cameras);
 
 (async () => {
