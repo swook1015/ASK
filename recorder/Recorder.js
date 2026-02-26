@@ -86,20 +86,20 @@ export class Recorder {
     }
 
     spawnSegmenter() {
-        // /var/recordings/ring/cam01/%Y%m%d/%H/%Y%m%d_%H%M%S_%s.mp4
         const outPattern = path.join(this.ringBase(), "%Y%m%d", "%H", "%Y%m%d_%H%M%S_%s.mp4");
-
         const size = `${this.width}x${this.height}`;
+
+        const inputArgs =
+            process.platform === "win32"
+                ? ["-f", "dshow", "-video_size", size, "-framerate", String(this.fps), "-i", this.devicePath]
+                : ["-f", "v4l2", "-framerate", String(this.fps), "-video_size", size, "-i", this.devicePath];
 
         const args = [
             "-hide_banner",
             "-loglevel", "warning",
-            "-f", "v4l2",
-            "-framerate", String(this.fps),
-            "-video_size", size,
-            "-i", this.devicePath,
 
-            // 안정적인 세그먼트/concat을 위해 GOP를 2초에 맞춤(대략 fps*2)
+            ...inputArgs,
+
             "-c:v", "libx264",
             "-preset", "veryfast",
             "-tune", "zerolatency",
