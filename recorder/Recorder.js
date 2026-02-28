@@ -227,16 +227,15 @@ export class Recorder {
             outMp4
         ], { name: `ffmpeg-concat-${this.camId}` });
 
+        const segmentCount = copied.length;
+
+        await Promise.allSettled(copied.map(f => fs.unlink(f)));
+        await fs.unlink(listPath).catch(() => {});
+
         await fs.writeFile(
             path.join(outDir, "meta.json"),
             JSON.stringify(
-                {
-                    camId: this.camId,
-                    eventMs,
-                    from,
-                    to,
-                    segmentCount: copied.length
-                },
+                { camId: this.camId, eventMs, from, to, segmentCount },
                 null,
                 2
             ),
