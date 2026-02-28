@@ -14,6 +14,7 @@
 const express = require("express");
 const path = require("path");
 const { ARCHIVE_DIR } = require("./recorder/paths");
+const fs = require("fs/promises");
 
 const web = express();
 
@@ -24,8 +25,70 @@ console.log("cwd:", process.cwd());
 
 web.use("/clips", express.static(ARCHIVE_DIR));
 
-web.listen(8080, () => {
-    console.log("Clip server running : http://localhost:8080/clips");
+web.listen(conf.clip.port, () => {
+    console.log(`Clip server running : http://${conf.clip.host}:${conf.clip.port}/clips`);
+});
+
+const clients = new Set();
+
+web.get("/events", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    res.flushHeaders?.();
+    res.write(`event: hello\ndata: "connected"\n\n`);
+
+
+    clients.add(res);
+
+    req.on("close", () => {
+        clients.delete(res);
+    });
+});
+
+setInterval(() => {
+    const ping = `event: ping\ndata: {}\n\n`;
+    for (const c of clients) c.write(ping);
+}, 15000);
+
+// 전역 함수
+global.pushEvent = (eventName, data) => {
+    const msg = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const c of clients) c.write(msg);
+};
+
+web.get("/api/falls", async (req, res) => {
+    try {
+        const camId = req.query.camId;
+        if (!camId) return res.status(400).json({ error: "camId required" });
+
+        const camDir = path.join(ARCHIVE_DIR, camId);
+        const dirs = await fs.readdir(camDir, { withFileTypes: true }).catch(() => []);
+        const out = [];
+
+        for (const d of dirs) {
+            if (!d.isDirectory()) continue;
+            const eventMs = Number(d.name);
+            if (!Number.isFinite(eventMs)) continue;
+
+            const folder = path.join(camDir, d.name);
+            const files = await fs.readdir(folder).catch(() => []);
+            const mp4 = files.find(f => f.startsWith("fall_") && f.endsWith(".mp4"));
+            if (!mp4) continue;
+
+            out.push({
+                camId,
+                eventMs,
+                clipUrl: `http://${conf.clip.host}:${conf.clip.port}/clips/${camId}/${eventMs}/${mp4}`,
+            });
+        }
+
+        out.sort((a, b) => b.eventMs - a.eventMs);
+        res.json(out);
+    } catch (e) {
+        res.status(500).json({ error: String(e) });
+    }
 });
 
 const cameras =

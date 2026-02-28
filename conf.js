@@ -68,6 +68,10 @@ cnt_arr = [
     },
 ];
 
+exports.clip = {
+    host: "192.168.0.2",
+    port: 8081
+};
 // build sub
 sub_arr = [];
 

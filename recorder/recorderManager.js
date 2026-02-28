@@ -1,5 +1,6 @@
 import { Recorder } from "./Recorder.js";
 import path from "path";
+import conf from "../conf.js";
 
 export class RecorderManager {
     constructor(camerasConfig) {
@@ -47,11 +48,14 @@ export class RecorderManager {
 
         const fileName = path.basename(result.outMp4);
 
-        // 서버 IP
-        const SERVER_IP = "192.168.0.2";
-
         const clipUrl =
-            `http://${SERVER_IP}:8080/clips/${camId}/${eventMs}/${fileName}`;
+            `http://${conf.clip.host}:${conf.clip.port}/clips/${camId}/${eventMs}/${fileName}`;
+
+        global.pushEvent?.("fall", {
+            camId,
+            eventMs: result.eventMs,
+            clipUrl,
+        });
 
         const cnt = global.conf?.cnt?.find(c => c.name === "fall_clip");
         if (global.onem2m_client && cnt) {
