@@ -61,31 +61,43 @@ global.pushEvent = (eventName, data) => {
 web.get("/api/falls", async (req, res) => {
     try {
         const camId = req.query.camId;
-        if (!camId) return res.status(400).json({ error: "camId required" });
+        const result = [];
 
-        const camDir = path.join(ARCHIVE_DIR, camId);
-        const dirs = await fs.readdir(camDir, { withFileTypes: true }).catch(() => []);
-        const out = [];
+        const scanCamera = async (cid) => {
+            const camDir = path.join(ARCHIVE_DIR, cid);
+            const dirs = await fs.readdir(camDir, { withFileTypes: true }).catch(() => []);
 
-        for (const d of dirs) {
-            if (!d.isDirectory()) continue;
-            const eventMs = Number(d.name);
-            if (!Number.isFinite(eventMs)) continue;
+            for (const d of dirs) {
+                if (!d.isDirectory()) continue;
 
-            const folder = path.join(camDir, d.name);
-            const files = await fs.readdir(folder).catch(() => []);
-            const mp4 = files.find(f => f.startsWith("fall_") && f.endsWith(".mp4"));
-            if (!mp4) continue;
+                const eventMs = Number(d.name);
+                if (!Number.isFinite(eventMs)) continue;
 
-            out.push({
-                camId,
-                eventMs,
-                clipUrl: `http://${conf.clip.host}:${conf.clip.port}/clips/${camId}/${eventMs}/${mp4}`,
-            });
+                const folder = path.join(camDir, d.name);
+                const files = await fs.readdir(folder).catch(() => []);
+                const mp4 = files.find(f => f.startsWith("fall_") && f.endsWith(".mp4"));
+                if (!mp4) continue;
+
+                result.push({
+                    camId: cid,
+                    eventMs,
+                    clipUrl:
+                        `http://${conf.clip.host}:${conf.clip.port}/clips/${cid}/${eventMs}/${mp4}`
+                });
+            }
+        };
+
+        if (camId) {
+            await scanCamera(camId);
+        } else {
+            const cams = await fs.readdir(ARCHIVE_DIR);
+            for (const cid of cams) {
+                await scanCamera(cid);
+            }
         }
 
-        out.sort((a, b) => b.eventMs - a.eventMs);
-        res.json(out);
+        result.sort((a, b) => b.eventMs - a.eventMs);
+        res.json(result);
     } catch (e) {
         res.status(500).json({ error: String(e) });
     }
