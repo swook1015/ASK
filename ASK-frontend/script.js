@@ -1,14 +1,7 @@
-/**
- * RISK-WATCH AI: 통합 제어 스크립트 
- * 1. 서버 연동: 192.168.0.2:8080 (Mobius)
- * 2. 상태 구성: Level 1(정상), Level 3(위험)
- * 3. 기능: 서버 데이터(camId, v, t) 기반 UI 갱신 및 로그 저장
- */
-
 /* 1. 글로벌 변수 설정 */
 let currentPage = 1;
 const rowsPerPage = 10;
-let selectedFilterDate = ""; 
+let selectedFilterDate = "";
 let emergencyActiveTimer = null; // 긴급 버튼 타이머 관리 변수
 let lastEventTime = null;       // 중복 데이터 처리 방지 변수 (이벤트 시간 t 기준)
 
@@ -16,7 +9,7 @@ let lastEventTime = null;       // 중복 데이터 처리 방지 변수 (이벤
 document.addEventListener('DOMContentLoaded', () => {
     initSidebar();
     initWebcam();
-    
+
     // 대시보드 요소가 있을 경우에만 폴링 및 로그 렌더링 시작
     if (document.getElementById('status-card')) {
         renderDashboardMiniLogs();
@@ -69,7 +62,7 @@ function initWebcam() {
     if (!webcamElement) return;
 
     // 실제 스트리밍 엔드포인트 주소
-    const actionCamStreamUrl = "http://192.168.0.2:8080/video_feed"; 
+    const actionCamStreamUrl = "http://192.168.0.2:8080/video_feed";
 
     if (webcamElement.tagName.toLowerCase() === 'video') {
         webcamElement.src = actionCamStreamUrl;
@@ -100,35 +93,35 @@ function updateDashboardUI(level, camId, eventTimeStr) {
         1: { type: "정상", cls: "status-normal", tag: "info" },
         3: { type: "위험", cls: "status-danger", tag: "danger" }
     };
-    
+
     const current = config[level] || config[1];
 
     if (level === 1) {
         statusCard.className = `status-card ${current.cls}`;
-        statusText.innerText = `[CAM ${camId}] 감지 중`; 
-        
+        statusText.innerText = `[CAM ${camId}] 감지 중`;
+
         if (emergencyBox && !emergencyActiveTimer) {
             emergencyBox.className = "emergency-box disabled";
         }
     } else {
         statusCard.className = `status-card ${current.cls}`;
-        statusText.innerText = `[CAM ${camId}] ${current.type} 상태`; 
-        
+        statusText.innerText = `[CAM ${camId}] ${current.type} 상태`;
+
         if (emergencyBox) {
             emergencyBox.className = "emergency-box active";
-            
+
             // 위험 상황 시 30초간 알림 활성화 후 자동 비활성화
             if (emergencyActiveTimer) {
                 clearTimeout(emergencyActiveTimer);
             }
-            
+
             emergencyActiveTimer = setTimeout(() => {
                 emergencyBox.className = "emergency-box disabled";
-                emergencyActiveTimer = null; 
+                emergencyActiveTimer = null;
             }, 30000);
         }
     }
-    
+
     const logMessage = `[카메라 ${camId}] ${current.type} 상황 감지`;
     saveLogToStorage(level, current.type, logMessage, current.tag, serverDateObj);
     renderDashboardMiniLogs();
@@ -150,15 +143,15 @@ function renderDashboardMiniLogs() {
 function saveLogToStorage(level, type, message, className, serverDateObj) {
     try {
         const logs = JSON.parse(localStorage.getItem('risk_logs')) || [];
-        
+
         const newLog = {
             id: Date.now(),
             level: level,
-            isoDate: serverDateObj.toISOString().split('T')[0], 
+            isoDate: serverDateObj.toISOString().split('T')[0],
             hour: serverDateObj.getHours(),
             date: serverDateObj.toLocaleDateString(),
             time: getFormattedTime(serverDateObj),
-            type, 
+            type,
             message,
             className
         };
@@ -188,8 +181,8 @@ function renderHistory(page = 1) {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const pagedLogs = filteredLogs.slice(startIndex, startIndex + rowsPerPage);
 
-    tbody.innerHTML = pagedLogs.length === 0 
-        ? `<tr><td colspan="3" style="padding:40px;">데이터가 없습니다.</td></tr>` 
+    tbody.innerHTML = pagedLogs.length === 0
+        ? `<tr><td colspan="3" style="padding:40px;">데이터가 없습니다.</td></tr>`
         : pagedLogs.map(l => `
             <tr>
                 <td>${l.date}<br>${l.time}</td>
@@ -199,7 +192,7 @@ function renderHistory(page = 1) {
         `).join('');
 
     updatePaginationUI(totalPages);
-    renderRiskChart(allLogs); 
+    renderRiskChart(allLogs);
 }
 
 /* 8. 그래프 렌더링 (직선형) */
@@ -215,7 +208,7 @@ function renderRiskChart(allLogs) {
         chartTitle = `${selectedFilterDate} 시간대별 추이 (24H)`;
         labels = ["00-02", "02-04", "04-06", "06-08", "08-10", "10-12", "12-14", "14-16", "16-18", "18-20", "20-22", "22-24"];
         dataCounts = new Array(12).fill(0);
-        
+
         const targetDayLogs = allLogs.filter(l => l.isoDate === selectedFilterDate);
         targetDayLogs.forEach(l => {
             if (l.hour !== undefined) {
@@ -230,7 +223,7 @@ function renderRiskChart(allLogs) {
             d.setDate(d.getDate() - i);
             const iso = d.toISOString().split('T')[0];
             const displayDate = (d.getMonth() + 1) + "/" + d.getDate();
-            
+
             labels.push(displayDate);
             const count = allLogs.filter(l => l.isoDate === iso).length;
             dataCounts.push(count);
@@ -241,7 +234,7 @@ function renderRiskChart(allLogs) {
     if (existingChart) existingChart.destroy();
 
     new Chart(canvas.getContext('2d'), {
-        type: 'line', 
+        type: 'line',
         data: {
             labels: labels,
             datasets: [{
@@ -278,79 +271,60 @@ function updatePaginationUI(totalPages) {
     const prevBtn = document.createElement('button');
     prevBtn.className = `pagination-btn ${currentPage === 1 ? 'disabled' : ''}`;
     prevBtn.innerText = '이전';
-    prevBtn.onclick = () => { if(currentPage > 1) renderHistory(currentPage - 1); };
+    prevBtn.onclick = () => { if (currentPage > 1) renderHistory(currentPage - 1); };
     const info = document.createElement('span');
     info.style.margin = "0 15px";
     info.innerText = `${currentPage} / ${totalPages}`;
     const nextBtn = document.createElement('button');
     nextBtn.className = `pagination-btn ${currentPage === totalPages ? 'disabled' : ''}`;
     nextBtn.innerText = '다음';
-    nextBtn.onclick = () => { if(currentPage < totalPages) renderHistory(currentPage + 1); };
+    nextBtn.onclick = () => { if (currentPage < totalPages) renderHistory(currentPage + 1); };
     container.appendChild(prevBtn);
     container.appendChild(info);
     container.appendChild(nextBtn);
 }
 
-/* 9. [Mobius 서버 연동] 192.168.0.2:8080 데이터 수신 로직 */
+/* 9. [Mobius 서버 연동] */
 async function fetchMobiusData() {
     try {
-        const raspIp = "192.168.0.2"; 
+        const raspIp = window.location.hostname || "192.168.0.2";
         const port = "7579";
-        const url = `http://${raspIp}:${port}/Mobius/KETI3_DEMO/fall_state/la`;
-        
+        const url = `http://${raspIp}:${port}/Mobius2/KETI3_DEMO/fall_state/la`;
+
         const headers = {
-            // 매번 새로운 요청 ID를 생성하여 "RI is none" 에러 방지
-            'X-M2M-RI': 'req-' + Date.now(), 
-            // Mobius AE 설정과 일치해야 함
-            'X-M2M-Origin': 'SKETI3_DEMO', 
+            'X-M2M-RI': 'req-' + Date.now(),
+            'X-M2M-Origin': 'SKETI3_DEMO',
             'Accept': 'application/json'
         };
 
-        const response = await fetch(url, { 
-            method: 'GET', 
+        const response = await fetch(url, {
+            method: 'GET',
             headers: headers,
-            mode: 'cors' 
+            mode: 'cors',
+            cache: 'no-store'
         });
-        
-        if (!response.ok) {
-            throw new Error(`Mobius 서버 응답 에러: ${response.status}`);
-        }
-        
+
+        if (!response.ok) throw new Error(`서버 응답 에러: ${response.status}`);
+
         const data = await response.json();
-        
-        // 데이터가 없는 경우 예외 처리
-        if (!data['m2m:cin']) {
-            console.warn("표시할 최신 데이터(cin)가 없습니다.");
-            return;
-        }
+        const cin = data['m2m:cin'];
 
-        let content = data['m2m:cin'].con;
-        
-        // con 데이터가 문자열 형태일 경우 JSON 파싱
+        if (!cin) return;
+
+        let content = cin.con;
         if (typeof content === 'string') {
-            try {
-                content = JSON.parse(content);
-            } catch(e) {
-                console.error("JSON 파싱 에러:", e);
-            }
+            try { content = JSON.parse(content); } catch (e) { return; }
         }
-        
-        // 서버 데이터 구조 매핑 (camId, t, v)
-        const camId = content.camId || "0";
-        const eventTime = content.t; 
-        const statusValue = content.v; 
-        
-        // v 값이 'fall'이면 Level 3, 아니면 Level 1
-        let level = (statusValue === 'fall') ? 3 : 1;
 
-        // 동일한 이벤트 시간에 대한 중복 처리 방지
-        if (lastEventTime !== eventTime) {
-            lastEventTime = eventTime; 
+        const camId = content.camId || "0";
+        const eventTime = content.t || cin.ct; // t가 없으면 생성시간(ct) 사용
+        const statusValue = content.v;
+        const level = (statusValue === 'fall') ? 3 : 1;
+
+        const eventKey = `${eventTime}_${statusValue}`;
+        if (window.lastEventKey !== eventKey) {
+            window.lastEventKey = eventKey;
             updateDashboardUI(level, camId, eventTime);
-            
-            if (level === 3) {
-                console.log(`🚨 [위험 감지] 카메라: ${camId} | 시간: ${eventTime}`);
-            }
         }
 
     } catch (error) {
@@ -358,9 +332,9 @@ async function fetchMobiusData() {
     }
 }
 
-/** 2초 주기로 Mobius 서버 데이터를 확인하는 폴링 함수 */
+
 function startMobiusPolling() {
     // 즉시 한 번 호출 후 인터벌 시작
-    fetchMobiusData(); 
-    setInterval(fetchMobiusData, 2000); 
+    fetchMobiusData();
+    setInterval(fetchMobiusData, 2000);
 }
