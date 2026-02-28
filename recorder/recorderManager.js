@@ -1,4 +1,5 @@
 import { Recorder } from "./Recorder.js";
+import path from "path";
 
 export class RecorderManager {
     constructor(camerasConfig) {
@@ -36,12 +37,33 @@ export class RecorderManager {
         this.recorders.delete(camId);
     }
 
+    // recorderManager.js
     async handleFall(camId, eventMs = Date.now()) {
         const r = this.recorders.get(camId);
-        if (!r) {
-            console.warn(`[RecorderManager] no recorder for camId=${camId}`);
-            return;
+        if (!r) return;
+
+        const result = await r.handleFall(eventMs);
+        if (!result) return;
+
+        const fileName = path.basename(result.outMp4);
+
+        // 서버 IP
+        const SERVER_IP = "192.168.0.2";
+
+        const clipUrl =
+            `http://${SERVER_IP}:8080/clips/${camId}/${eventMs}/${fileName}`;
+
+        const cnt = global.conf?.cnt?.find(c => c.name === "fall_clip");
+        if (global.onem2m_client && cnt) {
+            const parent = cnt.parent + "/" + cnt.name;
+            const payload = {
+                camId,
+                eventMs: result.eventMs,
+                from: result.from,
+                to: result.to,
+                clipUrl,
+            };
+            global.onem2m_client.create_cin(parent, 1, JSON.stringify(payload), this, () => {});
         }
-        await r.handleFall(eventMs);
     }
 }

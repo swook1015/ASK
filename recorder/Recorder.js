@@ -127,14 +127,26 @@ export class Recorder {
 
         const name = path.basename(file);
         const epochSec = parseEpochSecFromName(name);
-        if (!epochSec) return;
 
-        const startMs = epochSec * 1000;
+        let startMs;
+
+        if (epochSec) {
+            startMs = epochSec * 1000;
+        } else {
+            try {
+                const st = await fs.stat(file);
+                startMs = Math.max(0, st.mtimeMs - SEG_MS);
+            } catch (e) {
+                return;
+            }
+        }
+
         this.index.push({ startMs, file });
 
         const cutoff = Date.now() - (KEEP_RING_MS + 60_000);
-        while (this.index.length && this.index[0].startMs < cutoff)
+        while (this.index.length && this.index[0].startMs < cutoff) {
             this.index.shift();
+        }
     }
 
     pickSegmentsBetween(startMs, endMs) {
@@ -234,6 +246,7 @@ export class Recorder {
         console.log(
             `[Recorder:${this.camId}] saved fall clip -> ${outMp4}`
         );
+        return { outMp4, from, to, eventMs };
     }
 
     async cleanupOldSegments() {

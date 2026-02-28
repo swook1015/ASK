@@ -11,10 +11,22 @@
 /**
  * Created by ryeubi on 2015-08-31.
  */
+const express = require("express");
+const path = require("path");
+const { ARCHIVE_DIR } = require("./recorder/paths");
+
+const web = express();
+
 const conf = require("./conf");
 const { RecorderManager } = require("./recorder/RecorderManager");
 const { discoverCameras } = require("./recorder/discoverCameras");
 console.log("cwd:", process.cwd());
+
+web.use("/clips", express.static(ARCHIVE_DIR));
+
+web.listen(8080, () => {
+    console.log("Clip server running : http://localhost:8080/clips");
+});
 
 const cameras =
     (conf.cameras && Object.keys(conf.cameras).length > 0)

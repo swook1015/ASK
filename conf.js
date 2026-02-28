@@ -62,6 +62,10 @@ cnt_arr = [
         parent: '/' + cse.name + '/' + ae.name,
         name: 'fall_event',   // 낙상 발생
     },
+    {
+        parent: '/' + cse.name + '/' + ae.name,
+        name: 'fall_clip',   // 낙상 영상 클립 메타(경로 등)
+    },
 ];
 
 // build sub
