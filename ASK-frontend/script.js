@@ -10,20 +10,13 @@ let emergencyActiveTimer = null;
 /**
  * 1. 초기 로드 및 이벤트 리스너
  */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initSidebar();
 
-    // 대시보드 및 히스토리 요소 존재 확인 후 초기화
-    const isDashboard = document.getElementById('status-card');
-    const isHistory = document.getElementById('history-body');
-
-    // 1) 서버로부터 기존 낙상 기록 불러오기 (새로고침 대비)
-    fetchHistoryFromServer();
-
-    // 2) 실시간 이벤트 수신 시작 (SSE 연동)
+    // 과거 데이터를 먼저 다 가져온 후(await), 실시간 수신(SSE)을 시작합니다.
+    await fetchHistoryFromServer(); 
     initSSE();
 
-    // 날짜 필터 이벤트 리스너
     const datePicker = document.getElementById('date-filter');
     if (datePicker) {
         datePicker.addEventListener('change', (e) => {
@@ -32,13 +25,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 모달 닫기 이벤트 (외부 클릭 시)
     window.onclick = (event) => {
         const modal = document.getElementById('video-modal');
         if (event.target === modal) closeModal();
     };
 });
-
 /**
  * 2. 실시간 이벤트 수신 (SSE: Server-Sent Events)
  */
@@ -74,23 +65,43 @@ async function fetchHistoryFromServer() {
         const response = await fetch(`${CLIP_BASE_URL}/api/falls`);
         if (!response.ok) throw new Error("서버 응답 오류");
 
-        const data = await response.json(); // [{camId, eventMs, clipUrl}, ...]
+        const serverData = await response.json(); 
 
-        // 서버 데이터를 기존 로그 포맷으로 변환하여 저장
-        const formattedLogs = data.map(item => transformDataToLog(item));
+        // 1. 기존 로컬 로그 가져오기
+        const localLogs = JSON.parse(localStorage.getItem('risk_logs')) || [];
 
-        // LocalStorage 동기화 (최신순 정렬)
-        localStorage.setItem('risk_logs', JSON.stringify(formattedLogs));
+        // 2. 서버 데이터와 로컬 데이터를 합친 후, ID(eventMs) 기준으로 중복 제거
+        // Map을 사용하면 동일한 key(ID)를 가진 데이터는 마지막에 들어온 것으로 덮어씌워집니다.
+        const allLogsMap = new Map();
+        
+        // 서버 데이터를 먼저 넣고
+        serverData.forEach(item => {
+            const log = transformDataToLog(item);
+            allLogsMap.set(log.id, log);
+        });
+        
+        // 로컬에만 있는 최신 데이터가 있다면 유지 (혹은 그 반대)
+        localLogs.forEach(log => {
+            if (!allLogsMap.has(log.id)) {
+                allLogsMap.set(log.id, log);
+            }
+        });
 
-        // 화면 렌더링
+        // 3. Map을 다시 배열로 변환 후 시간순(내림차순) 정렬
+        const finalLogs = Array.from(allLogsMap.values())
+            .sort((a, b) => b.id - a.id);
+
+        // 4. LocalStorage 업데이트
+        localStorage.setItem('risk_logs', JSON.stringify(finalLogs.slice(0, 500)));
+
+        // 5. 화면 렌더링
         renderHistory(1);
         renderDashboardMiniLogs();
     } catch (err) {
         console.error("기록 데이터를 가져오는데 실패했습니다:", err);
-        renderHistory(1); // 실패 시 기존 로컬 데이터라도 노출
+        renderHistory(1); 
     }
 }
-
 /**
  * 4. 데이터 변환 및 저장 유틸리티
  */
