@@ -27,9 +27,8 @@
         <ul>
             <li><a href="main.html"><i class="fas fa-house"></i> 홈</a></li>
             <li><a href="index.html"><i class="fas fa-desktop"></i> 대시보드</a></li>
-            <li><a href="history.html" class="active"><i class="fas fa-history"></i> 과거 데이터</a></li>
             <li><a href="intro.html"><i class="fas fa-info-circle"></i> 서비스 소개</a></li>
-
+            <li><a href="history.html" class="active"><i class="fas fa-history"></i> 과거 데이터</a></li>
         </ul>
     </nav>
     <div id="overlay" class="overlay"></div>
@@ -45,7 +44,8 @@
             <section class="history-left">
                 <div class="section-header">
                     <h3><i class="fas fa-list"></i> 상세 이력 로그</h3>
-                    <input type="date" id="date-filter" class="filter-input">
+                    <button onclick="localStorage.removeItem('risk_logs'); location.reload();"
+                        class="btn-clear">초기화</button>
                 </div>
 
                 <div class="table-wrapper box-style">
@@ -75,14 +75,6 @@
                 </div>
             </section>
         </div>
-        <div id="video-modal" class="modal" style="display:none;">
-            <div class="modal-content">
-                <span class="close-modal" onclick="closeModal()">&times;</span>
-                <h3 id="modal-title">낙상 감지 영상</h3>
-                <video id="history-video-player" controls width="100%"></video>
-                <p id="modal-info" style="margin-top:10px; font-size: 0.9rem; color: #666;"></p>
-            </div>
-        </div>
     </main>
 
     <footer>
@@ -106,8 +98,7 @@
             </div>
         </div>
     </footer>
-
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 
 </html>

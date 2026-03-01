@@ -1,0 +1,535 @@
+/* 1. 전문 폰트 호출 (최상단) */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://webfontworld.github.io/gmarket/GmarketSans.css');
+@import url('https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;600&display=swap');
+
+:root {
+    --font-title: 'GmarketSans', sans-serif;
+    --font-ui: 'Pretendard', sans-serif;
+    --font-data: 'Spoqa Han Sans Neo', sans-serif;
+    --font-tech: 'IBM Plex Sans KR', sans-serif;
+
+    --bg-color: #ffffff;
+    --primary-color: #000000;
+    --border-color: #000000;
+    --text-muted: #666666;
+    --normal-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #c0392b;
+}
+
+/* 2. 레이아웃 기반 - 모든 요소 너비 제한 및 박스 모델 고정 */
+* {
+    box-sizing: border-box;
+    max-width: 100%;
+    /* 어떤 요소도 부모 너비를 초과하지 못하도록 강제 */
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    /* 가로 스크롤 원천 차단 */
+    width: 100%;
+}
+
+body {
+    font-family: var(--font-ui);
+    background: var(--bg-color);
+    color: var(--primary-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* 3. 헤더 (Header) */
+header {
+    background: #000000;
+    color: var(--bg-color);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    flex-shrink: 0;
+    width: 100%;
+}
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    /* 좌, 중, 우 요소 간격을 벌림 */
+    align-items: center;
+    /* 세로 중앙 정렬 */
+    padding: 0 20px;
+    /* 좌우 끝 여백 */
+    height: 140px;
+    background: #000;
+    /* 기존 스타일 유지 */
+    color: #fff;
+}
+
+/* 햄버거 버튼 (맨 왼쪽 배치) */
+.hamburger-left {
+    background: none;
+    /* 배경 투명하게 수정 */
+    border: none;
+    color: #fff;
+    /* 아이콘 색상 화이트 */
+    font-size: 1.8rem;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    z-index: 100;
+}
+
+/* 로고 (완벽한 중앙 배치를 위해 flex: 1 사용) */
+.logo {
+    position: absolute;
+    /* 부모 컨테이너 기준 절대 위치 */
+    left: 50%;
+    /* 왼쪽에서 50% 이동 */
+    transform: translateX(-50%);
+    /* 본인 너비의 절반만큼 왼쪽으로 밀어 정확히 중앙 배치 */
+    font-size: 3.0rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+}
+
+/* 오른쪽 빈 공간 (로고 중앙 정렬 균형용) */
+.header-empty {
+    width: 1.8rem;
+    /* 햄버거 버튼과 동일한 너비 부여 */
+}
+
+/* 4. 사이드바 (Side Nav) */
+.side-nav {
+    position: fixed;
+    top: 0;
+    left: -300px;
+    width: 300px;
+    height: 100%;
+    background: #000;
+    color: #fff;
+    transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2000;
+}
+
+.side-nav.active {
+    left: 0;
+}
+
+.nav-header {
+    padding: 30px;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #333;
+    font-family: var(--font-title);
+}
+
+.side-nav ul {
+    list-style: none;
+    padding: 20px 0;
+    margin: 0;
+}
+
+.side-nav ul li a {
+    display: block;
+    padding: 20px 30px;
+    color: #999;
+    text-decoration: none;
+    font-size: 1.1rem;
+}
+
+.side-nav ul li a:hover,
+.side-nav ul li a.active {
+    color: #fff;
+    background: #1a1a1a;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    z-index: 1500;
+}
+
+.overlay.active {
+    display: block;
+}
+
+/* 5. 공통 컨텐츠 영역 */
+main {
+    flex: 1 0 auto;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 30px;
+}
+
+.breadcrumbs {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px 30px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    border-bottom: 1px solid #eee;
+}
+
+/* 6. 메인 대시보드 (index.html) */
+.dashboard-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+    align-items: stretch;
+    width: 100%;
+}
+
+.video-wrapper {
+    position: relative;
+    background: #000;
+    border: 2px solid #000;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+    width: 100%;
+}
+
+#webcam {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#status-card {
+    height: 120px;
+    border: 2px solid #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    font-weight: 800;
+    font-size: 1.4rem;
+    font-family: var(--font-data);
+    width: 100%;
+}
+
+.log-container {
+    flex-grow: 1;
+    border: 2px solid #000;
+    overflow-y: auto;
+    background: #fff;
+    font-family: var(--font-tech);
+    width: 100%;
+}
+
+.log-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+}
+
+.history-title-area {
+    display: flex;
+    justify-content: space-between;
+    /* 양 끝으로 배치 */
+    align-items: center;
+    /* 세로 높이 중앙 맞춤 */
+    margin-bottom: 15px;
+    /* 아래쪽 표와의 간격 */
+    width: 100%;
+}
+
+.history-title-area h3 {
+    margin: 0;
+    /* 제목 특유의 기본 여백 제거 */
+    font-size: 1.2rem;
+}
+
+/* 초기화 버튼 스타일 (필요시 조정) */
+.btn-clear {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.btn-clear:hover {
+    background: #f5f5f5;
+}
+
+/* 7. 과거 데이터 (history.html) 모바일 잘림 방지 최적화 */
+/* 1. 그리드 설정: 두 컬럼의 높이를 동일하게(stretch) 설정 */
+.history-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* 1:1 비율 */
+    gap: 30px;
+    align-items: stretch;
+    /* 자식 요소들의 높이를 동일하게 맞춤 */
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* 2. 공통 섹션 헤더 (제목과 버튼을 한 줄로) */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    height: 35px;
+    /* 헤더 높이 통일 */
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+/* 3. [핵심] 표와 그래프 박스의 높이를 고정하여 일치시킴 */
+.box-style {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    height: 650px;
+    /* 원하는 높이로 고정 (예: 450px) */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 4. 표 영역 내부 스크롤 설정 */
+/* 4. 표 영역 내부 스타일 및 중앙 정렬 */
+.table-wrapper {
+    overflow-y: auto;
+    flex: 1;
+    /* 박스 높이에 맞춰 꽉 채움 */
+}
+
+.table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    /* 테두리 중첩 제거 */
+    table-layout: fixed;
+    /* 컬럼 너비 고정 (선택 사항) */
+}
+
+/* 헤더와 셀 공통 스타일 */
+.table-wrapper th,
+.table-wrapper td {
+    border: 1px solid #eee;
+    /* 표 내부 줄(경계선) 추가 */
+    padding: 12px 8px;
+    /* 상하좌우 여백 */
+    text-align: center;
+    /* [핵심] 내용을 가운데 정렬 */
+    vertical-align: middle;
+    /* 세로 방향도 중앙 배치 */
+    font-size: 0.9rem;
+    word-break: keep-all;
+    /* 단어 단위 끊김 방지 */
+}
+
+/* 표 헤더 강조 */
+.table-wrapper th {
+    background-color: #f9f9f9;
+    /* 헤더 배경색 */
+    font-weight: 700;
+    position: sticky;
+    /* 스크롤 시 헤더 고정 */
+    top: 0;
+    z-index: 10;
+    border-bottom: 2px solid #ddd;
+    /* 헤더 하단만 조금 더 두껍게 */
+}
+
+/* 마우스 호버 시 행 강조 */
+.table-wrapper tbody tr:hover {
+    background-color: #fcfcfc;
+}
+
+/* 5. 그래프 영역 내부 패딩 */
+.graph-wrapper {
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* 6. 모바일 대응 */
+@media (max-width: 900px) {
+    .history-grid {
+        grid-template-columns: 1fr;
+        /* 모바일은 다시 세로로 */
+    }
+
+    .box-style {
+        height: 350px;
+        /* 모바일에서는 높이 축소 */
+    }
+}
+
+/* 8. 푸터 (Footer) */
+footer {
+    flex-shrink: 0;
+    background: #000;
+    color: #fff;
+    padding: 10px 20px 30px 10px;
+    width: 100%;
+}
+
+.footer-container {
+    max-width: 1400px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 20px;
+    width: 100%;
+}
+
+.footer-logo {
+    font-family: var(--font-title);
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+.footer-detail {
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.footer-right {
+    text-align: right;
+}
+
+.copyright {
+    font-family: var(--font-data);
+    font-size: 0.8rem;
+    color: #555;
+    margin-top: 10px;
+}
+
+/* 9. [핵심 수정] 모바일 및 태블릿 반응형 미디어 쿼리 */
+@media (max-width: 1100px) {
+    main {
+        padding: 20px 10px;
+    }
+
+    /* 본문 패딩을 대폭 줄여 내부 컨텐츠 공간 확보 */
+    .breadcrumbs {
+        padding: 15px 15px;
+    }
+
+    .dashboard-container,
+    .history-grid {
+        grid-template-columns: 100%;
+        /* 1단 구성 시 너비를 100%로 명시 */
+        gap: 30px;
+        width: 100%;
+    }
+
+    .table-wrapper,
+    .graph-wrapper {
+        height: auto;
+        min-height: 400px;
+        /* 모바일에서는 내용에 맞게 조절되되 최소 높이 유지 */
+        width: 100%;
+    }
+
+    .logo {
+        font-size: 1.5rem;
+    }
+
+}
+
+@media (max-width: 768px) {
+    .header-container {
+        padding: 0 15px;
+        height: 70px;
+    }
+
+    /* 푸터 모바일 정렬 */
+    .footer-container {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .footer-right {
+        text-align: left;
+        border-top: 1px solid #333;
+        padding-top: 20px;
+        width: 100%;
+    }
+}
+
+/* 상태 애니메이션 및 기타 스타일 */
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.status-normal {
+    background: var(--normal-color);
+    color: #fff;
+    border: none !important;
+}
+
+.status-warning {
+    background: var(--warning-color);
+    color: #fff;
+    border: none !important;
+}
+
+.status-danger {
+    background: var(--danger-color);
+    color: #fff;
+    border: none !important;
+    animation: blink 0.8s infinite;
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+    width: 100%;
+}
+
+.pagination-btn {
+    border: 1px solid #000;
+    background: #fff;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-family: var(--font-data);
+    font-size: 0.85rem;
+}
+
+.pagination-btn.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}

@@ -7,7 +7,6 @@
     <title>Dashboard - RISK WATCH AI</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
 </head>
 
 <body>
@@ -31,9 +30,8 @@
         <ul>
             <li><a href="main.html"><i class="fas fa-house"></i> 홈</a></li>
             <li><a href="index.html" class="active"><i class="fas fa-desktop"></i> 대시보드</a></li>
-            <li><a href="history.html"><i class="fas fa-history"></i> 과거 데이터</a></li>
             <li><a href="intro.html"><i class="fas fa-info-circle"></i> 서비스 소개</a></li>
-
+            <li><a href="history.html"><i class="fas fa-history"></i> 과거 데이터</a></li>
         </ul>
     </nav>
     <div id="overlay" class="overlay"></div>
@@ -101,15 +99,7 @@
             </div>
         </div>
     </footer>
-    <script src="script.js"></script>
-    <div id="video-modal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">&times;</span>
-            <h3 id="modal-title">낙상 감지 영상 (실시간 로그)</h3>
-            <video id="history-video-player" controls width="100%"></video>
-            <p id="modal-info" style="margin-top:10px; font-size: 0.9rem; color: #666;"></p>
-        </div>
-    </div>
+    <script type="module" src="script.js"></script>
 </body>
 
 </html>
