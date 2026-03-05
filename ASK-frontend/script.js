@@ -3,10 +3,9 @@
  * Choi Inha 님의 Project ASK 관제 시스템용 스크립트입니다.
  */
 const CLIP_BASE_URL = "http://192.168.0.2:8081"; // 로그 및 SSE 서버
-const CORAL_AI_URL = "http://192.168.0.140:5050"; // 코랄보드 AI 영상 서버
+const CORAL_AI_URL = "http://192.168.0.140:5050"; // 코랄보드 AI 영상 서버 (MJPEG)
 let currentCamId = ""; 
 let camStates = {}; 
-let pc = null; // WebRTC PeerConnection 객체
 
 let currentPage = 1;
 const rowsPerPage = 10;
@@ -52,19 +51,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /**
- * 2. WebRTC 핵심 로직 (코랄보드 연동 수정)
+ * 2. 영상 스트리밍 로직 (MJPEG 방식 적용)
  */
 
-function stopWebRTC() {
-    if (pc) {
-        pc.close();
-        pc = null;
-    }
+function stopVideo() {
     const webcamElement = document.getElementById('webcam');
     if (webcamElement) {
-        webcamElement.srcObject = null;
-        // 만약 MJPEG 방식을 혼용한다면 src도 초기화
-        webcamElement.src = "";
+        webcamElement.src = ""; // 스트림 연결 해제
     }
 }
 
@@ -72,58 +65,19 @@ async function initWebcam() {
     const webcamElement = document.getElementById('webcam');
     if (!webcamElement || !currentCamId) return;
 
-    stopWebRTC();
+    // 1. 이전 연결 정리
+    stopVideo();
 
-    /**
-     * [참고] 만약 코랄보드가 WebRTC 시그널링을 지원하지 않고 
-     * 단순 MJPEG 스트림(/video_feed)만 제공한다면 아래 주석을 해제하고 사용하세요.
-     * * webcamElement.src = `${CORAL_AI_URL}/video_feed`; // MJPEG 방식일 때
-     * return;
-     */
-
-    // WebRTC 방식 (코랄보드와 SDP 교환)
-    pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    });
-
-    pc.ontrack = (event) => {
-        if (webcamElement.srcObject !== event.streams[0]) {
-            webcamElement.srcObject = event.streams[0];
-            console.log(`[${currentCamId}] 코랄보드 AI 스트림 수신 시작`);
-        }
-    };
-
-    pc.addTransceiver('video', { direction: 'recvonly' });
-
-    try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // 코랄보드 AI 서버의 WebRTC 엔드포인트로 Offer 전송
-        // 엔드포인트 경로는 코랄보드 백엔드 설정에 따라 /offer 등으로 바뀔 수 있습니다.
-        const response = await fetch(`${CORAL_AI_URL}/offer`, {
-            method: 'POST',
-            body: JSON.stringify({
-                sdp: pc.localDescription.sdp,
-                type: pc.localDescription.type,
-                cam_id: currentCamId // 카메라 ID 전달
-            }),
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (!response.ok) throw new Error("코랄보드 응답 오류");
-
-        const answer = await response.json();
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
-    } catch (err) {
-        console.error(`[${currentCamId}] 코랄보드 WebRTC 연결 실패:`, err);
-        // 실패 시 폴백(Fallback)으로 일반 MJPEG 연결 시도 시나리오
-        webcamElement.src = `${CORAL_AI_URL}/video_feed`;
-    }
+    // 2. MJPEG 스트림 URL 설정
+    // 코랄보드 서버의 /video_feed 엔드포인트를 사용합니다.
+    const streamUrl = `${CORAL_AI_URL}/video_feed`;
+    
+    webcamElement.src = streamUrl;
+    console.log(`[${currentCamId}] MJPEG 스트림 연결: ${streamUrl}`);
 }
 
 /**
- * 3. 카메라 UI 및 전환 로직 (기능 유지)
+ * 3. 카메라 UI 및 전환 로직
  */
 async function fetchAvailableCameras() {
     try {
@@ -178,7 +132,7 @@ function switchCamera(targetCamId) {
 }
 
 /**
- * 4. SSE 및 실시간 이벤트 (기능 유지)
+ * 4. SSE 및 실시간 이벤트
  */
 function initSSE() {
     const es = new EventSource(`${CLIP_BASE_URL}/events`);
@@ -218,7 +172,7 @@ function updateDashboardUI(level, camId, eventMs, clipUrl) {
 }
 
 /**
- * 5. 화면 렌더링 및 대시보드 관리 (기능 유지)
+ * 5. 화면 렌더링 및 대시보드 관리
  */
 function refreshDashboardView() {
     const statusCard = document.getElementById('status-card');
@@ -266,7 +220,7 @@ function renderDashboardMiniLogs() {
 }
 
 /**
- * 6. 데이터 영속성 및 히스토리 (기능 유지)
+ * 6. 데이터 영속성 및 히스토리
  */
 async function fetchHistoryFromServer() {
     try {
@@ -367,16 +321,13 @@ function closeModal() {
 function openLiveModal() {
     const modal = document.getElementById('live-expand-modal');
     const mainWebcam = document.getElementById('webcam');
-    const expandedVideo = document.getElementById('live-expanded-stream');
+    const expandedImg = document.getElementById('live-expanded-stream');
     const title = document.getElementById('live-modal-title');
 
-    if (!modal || !mainWebcam || !expandedVideo) return;
+    if (!modal || !mainWebcam || !expandedImg) return;
 
-    if (mainWebcam.srcObject) {
-        expandedVideo.srcObject = mainWebcam.srcObject;
-    } else {
-        expandedVideo.src = mainWebcam.src; // MJPEG 대응
-    }
+    // MJPEG 방식이므로 src 주소만 그대로 복사합니다.
+    expandedImg.src = mainWebcam.src;
     
     title.innerHTML = `<i class="fas fa-video"></i> [실시간 관제] ${currentCamId.toUpperCase()}`;
     modal.style.display = 'block';
@@ -385,11 +336,10 @@ function openLiveModal() {
 
 function closeLiveModal() {
     const modal = document.getElementById('live-expand-modal');
-    const expandedVideo = document.getElementById('live-expanded-stream');
+    const expandedImg = document.getElementById('live-expanded-stream');
     if (modal) {
         modal.style.display = 'none';
-        expandedVideo.srcObject = null;
-        expandedVideo.src = "";
+        expandedImg.src = ""; // 스트림 중단
         document.body.style.overflow = '';
     }
 }
