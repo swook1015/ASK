@@ -4,23 +4,21 @@ import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks
 
 # ==========================================
-# 1. 데이터 로드 (최적화됨: 이미 합친 npy를 바로 불러옴)
+# 1. 데이터 로드 (수정됨: 이미 만들어진 2D와 3D 파일을 각각 불러옴)
 # ==========================================
-def load_lpn_dataset_fast(merged_npy_path):
-    print(f"📦 통합 데이터셋 로드 중: {merged_npy_path}")
-    final_data = np.load(merged_npy_path) # (3412800, 39)
+def load_lpn_dataset_direct(x_path, y_path):
+    print(f"📦 2D 입력(X) 데이터 로드 중: {x_path}")
+    # 이미 26차원(Z축 제거됨)으로 가공된 문제지 파일 로드
+    x_train = np.load(x_path).astype('float32') 
     
-    # [Y 데이터] 3D 정답지
-    y_train = final_data.astype('float32')
-    
-    # [X 데이터] 2D 입력값 (Z축만 제거하여 26차원 만들기)
-    x_indices = [i for i in range(39) if i % 3 != 2]
-    x_train = final_data[:, x_indices].astype('float32')
+    print(f"📦 3D 정답(Y) 데이터 로드 중: {y_path}")
+    # 원본 39차원 정답지 파일 로드
+    y_train = np.load(y_path).astype('float32') 
     
     return x_train, y_train
 
 # ==========================================
-# 2. LPN 모델 설계 (논문 참고)
+# 2. LPN 모델 설계 (논문 참고 구조 그대로 유지)
 # ==========================================
 def residual_block(x, nodes, dropout_rate=0.5):
     shortcut = x
@@ -59,35 +57,38 @@ def build_paper_lpn(input_dim=26, output_dim=39):
     return model
 
 # ==========================================
-# 3. 실행부 (수정 및 최적화됨)
+# 3. 실행부 
 # ==========================================
 if __name__ == "__main__":
-    # 💡 아까 만들어둔 단일 거대 npy 파일 경로를 사용합니다.
-    npy_file_path = './AI/dataset/LPN-label/ntu_lpn_target_3d.npy'
+    # 💡 아까 만들어둔 두 개의 파일 경로를 각각 지정합니다.
+    x_file_path = './AI/dataset/LPN-train/ntu_lpn_input_2d.npy'
+    y_file_path = './AI/dataset/LPN-train/ntu_lpn_target_3d_final.npy'
     
-    # 1. 데이터 로드
-    X, Y = load_lpn_dataset_fast(npy_file_path)
-    print(f"✅ 학습 데이터 준비 완료! X: {X.shape}, Y: {Y.shape}")
+    # 1. 데이터 로드 (자르는 로직 없이 바로 불러옴!)
+    X, Y = load_lpn_dataset_direct(x_file_path, y_file_path)
+    print(f"✅ 학습 데이터 준비 완료! X(문제): {X.shape}, Y(정답): {Y.shape}")
 
-    # 2. 모델 생성 (오타 수정: build_lpn_model -> build_paper_lpn)
+    # 2. 모델 생성
     lpn_model = build_paper_lpn()
     lpn_model.summary()
 
-    # 조기 종료(Early Stopping) 추가: 더 이상 성능 개선이 없으면 100번 다 안 채우고 멈춤
-    early_stop = callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+    # 콜백 설정 (조기 종료 + 학습률 자동 조절)
+    early_stop = callbacks.EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
+    lr_reducer = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=0.00001)
 
     # 3. 학습 시작
     print("🚀 논문 구조 기반 LPN 학습을 시작합니다...")
     history = lpn_model.fit(
         X, Y, 
         epochs=100, 
-        batch_size=1024,  # 💡 340만 개 데이터이므로 128은 너무 느립니다. 1024로 키웠습니다.
+        batch_size=1024,  # 대용량 데이터이므로 배치 사이즈를 넉넉하게!
         validation_split=0.1,
-        callbacks=[early_stop],
+        callbacks=[early_stop, lr_reducer],
         verbose=1
     )
 
     # 4. 모델 저장
-    os.makedirs('./AI/models', exist_ok=True) # 폴더가 없으면 에러가 나므로 생성 코드 추가
-    lpn_model.save('./AI/models/lpn_paper_3d_lifter.h5')
-    print("🎉 LPN 모델 저장이 완료되었습니다!")
+    os.makedirs('./AI/models', exist_ok=True)
+    save_path = './AI/models/lpn_paper_3d_lifter.h5'
+    lpn_model.save(save_path)
+    print(f"🎉 LPN 모델 저장이 완료되었습니다! (저장 위치: {save_path})")
