@@ -2,131 +2,128 @@ import os
 import cv2
 import numpy as np
 import tensorflow as tf
-from ultralytics import YOLO  # YOLO 라이브러리 추가
+from ultralytics import YOLO
+import psutil
 
-# Keras 2(Legacy) 엔진 강제 사용 (호환성 유지)
+# Keras 2(Legacy) 엔진 강제 사용
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
-print("🚀 [1] 로컬 모델 3종 세트 로드 중...")
-# MoveNet 대신 YOLOv8-pose 모델 로드 (업로드된 가중치 파일 사용)
+# ==========================================
+# ⚙️ 1. 모델 로드 및 설정
+# ==========================================
+print("🚀 [1] 모델 로드 중...")
 yolo_model = YOLO('AI/models/yolo/yolov8n-pose.pt') 
 lpn_model = tf.keras.models.load_model('lpn_remaster_60_legacy.h5')
 tcn_model = tf.keras.models.load_model('tcn_fall_detector_stride_best.h5')
 
-print("🎥 [2] 영상 로드 및 시각화 준비")
-VIDEO_PATH = '3.mp4' 
-OUTPUT_PATH = 'result_video.mp4' 
+VIDEO_PATH = '1.mp4' 
+OUTPUT_PATH = '1result_video_optimized.mp4' 
 
 cap = cv2.VideoCapture(VIDEO_PATH)
-
-width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-fps = cap.get(cv2.CAP_PROP_FPS)
+fps    = cap.get(cv2.CAP_PROP_FPS)
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 out = cv2.VideoWriter(OUTPUT_PATH, fourcc, fps, (width, height))
 
-frames_2d = []
-annotated_frames = [] 
+# LPN/TCN 입력에 필요한 13개 관절 인덱스
+KEEP_INDICES = [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
-edges = [
-    (0, 5), (0, 6), (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),
-    (5, 11), (6, 12), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16)
+# 13개 관절 기준 연결선 (거미줄 방지)
+NEW_EDGES = [
+    (0,1), (0,2), (1,2),          # 머리-어깨
+    (1,3), (3,5), (2,4), (4,6),   # 팔
+    (1,7), (2,8), (7,8),          # 몸통
+    (7,9), (9,11), (8,10), (10,12)# 다리
 ]
 
-# 💡 추가됨: YOLO의 절대 좌표를 기존 MoveNet의 256x256 패딩 기준 정규화 좌표(0~1)로 변환
-# (이후의 lpn_model이 기존과 동일한 형태의 데이터를 받도록 호환성 유지)
-def get_movenet_norm_coords(orig_x, orig_y, w, h):
-    target = 256.0
-    scale = target / max(w, h)
-    pad_x = (target - (w * scale)) / 2.0
-    pad_y = (target - (h * scale)) / 2.0
-    
-    x_norm = (orig_x * scale + pad_x) / target
-    y_norm = (orig_y * scale + pad_y) / target
-    return x_norm, y_norm
+# 실시간 추론을 시뮬레이션하기 위한 60프레임 버퍼
+joint_buffer = []
 
-print("⏳ [3] 프레임 추출 및 뼈대 그리기 진행 중 (영상 끝까지)...")
-keep_indices = [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+print(f"⏳ [2] 영상 처리 시작: {VIDEO_PATH} ({width}x{height}, {fps:.1f}fps)")
 
+# ==========================================
+# 🧠 2. 메인 처리 루프
+# ==========================================
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
         break
     
-    # YOLOv8-pose 추론 실행
+    # YOLOv8-pose 추론 (정사각형 리사이즈 없이 원본 비율 유지 시도)
     results = yolo_model(frame, verbose=False)
-
-    # 관절 좌표 추출 (사람이 감지된 경우 첫 번째 사람 기준)
+    
+    # 1. 관절 좌표 추출
     if results[0].keypoints is not None and len(results[0].keypoints.data) > 0:
-        # shape: (17, 3) -> [x, y, confidence]
-        kpts = results[0].keypoints.data[0].cpu().numpy() 
+        # shape: (17, 3) -> [x, y, conf]
+        kpts = results[0].keypoints.data[0].cpu().numpy()
     else:
         kpts = np.zeros((17, 3))
 
-    keypoints_13 = []
-    for idx in keep_indices:
-        x, y, conf = kpts[idx]
-        # 모델 입력을 위해 좌표 정규화 진행
-        x_norm, y_norm = get_movenet_norm_coords(x, y, width, height)
-        keypoints_13.extend([x_norm, y_norm])
-    frames_2d.append(keypoints_13)
+    # 2. LPN/TCN 입력을 위한 데이터 정규화 (핵심: [-1, 1] 범위)
+    # 구형 get_movenet_norm_coords 제거
+    current_frame_2d = []
+    for idx in KEEP_INDICES:
+        x, y, _ = kpts[idx]
+        # 문서 가이드라인 준수: [0, 1] 변환 후 [-1, 1]로 매핑
+        norm_x = (x / width) * 2.0 - 1.0
+        norm_y = (y / height) * 2.0 - 1.0
+        current_frame_2d.extend([norm_x, norm_y])
 
+    # 3. 슬라이딩 윈도우 버퍼 업데이트
+    joint_buffer.append(current_frame_2d)
+    if len(joint_buffer) > 60:
+        joint_buffer.pop(0)
+
+    # 4. 낙상 추론 (60프레임이 찼을 때만 실행)
+    fall_prob = 0.0
+    if len(joint_buffer) == 60:
+        seq_2d = np.array(joint_buffer, dtype=np.float32).reshape(1, 60, 26)
+        seq_3d = lpn_model.predict(seq_2d, verbose=0)
+        fall_prob = tcn_model.predict(seq_3d, verbose=0)[0][0]
+
+    # ==========================================
+    # 🖼️ 3. 시각화 (Annotating)
+    # ==========================================
     draw_frame = frame.copy()
     
-    # 뼈대 그리기 (YOLO는 절대 픽셀 좌표를 반환하므로 복잡한 매핑 없이 바로 사용)
-    for edge in edges:
-        p1, p2 = edge
-        x1, y1, s1 = kpts[p1]
-        x2, y2, s2 = kpts[p2]
-        if s1 > 0.2 and s2 > 0.2:
+    # 상태 텍스트 설정
+    if fall_prob > 0.85:
+        status_text = f"FALL DETECTED! ({fall_prob*100:.1f}%)"
+        color = (0, 0, 255) # 빨간색
+    else:
+        status_text = f"NORMAL ({fall_prob*100:.1f}%)"
+        color = (255, 0, 0) # 파란색
+
+    # 13개 관절 뼈대 그리기
+    for edge in NEW_EDGES:
+        p1_idx, p2_idx = edge
+        # kpts는 17개 관절이므로 KEEP_INDICES의 실제 인덱스를 사용
+        p1_orig = KEEP_INDICES[p1_idx]
+        p2_orig = KEEP_INDICES[p2_idx]
+        
+        x1, y1, c1 = kpts[p1_orig]
+        x2, y2, c2 = kpts[p2_orig]
+        
+        if c1 > 0.4 and c2 > 0.4: # 신뢰도 높은 선만 그리기
             cv2.line(draw_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
 
     # 관절점 그리기
-    for idx in keep_indices:
-        x, y, s = kpts[idx]
-        if s > 0.2:
+    for idx in KEEP_INDICES:
+        x, y, c = kpts[idx]
+        if c > 0.4:
             cv2.circle(draw_frame, (int(x), int(y)), 5, (0, 0, 255), -1)
 
-    annotated_frames.append(draw_frame)
+    # UI 텍스트 오버레이
+    cv2.rectangle(draw_frame, (20, 15), (550, 70), (0, 0, 0), -1)
+    cv2.putText(draw_frame, status_text, (30, 55), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+    
+    out.write(draw_frame)
 
 cap.release()
-
-total_frames = len(frames_2d)
-if total_frames == 0:
-    print("❌ 프레임 추출 실패")
-    exit()
-
-print(f"✅ 원본 영상 총 {total_frames} 프레임 추출 완료.")
-
-print("🏗️ [4] AI 입력을 위한 60프레임 샘플링 및 모델 추론")
-if total_frames > 60:
-    indices = np.linspace(0, total_frames - 1, 60).astype(int)
-    sampled_2d = [frames_2d[i] for i in indices]
-elif total_frames < 60:
-    sampled_2d = frames_2d.copy()
-    while len(sampled_2d) < 60:
-        sampled_2d.append(sampled_2d[-1])
-else:
-    sampled_2d = frames_2d.copy()
-
-sequence_2d = np.array(sampled_2d, dtype=np.float32).reshape(1, 60, 26)
-sequence_3d = lpn_model.predict(sequence_2d, verbose=0)
-fall_prob = tcn_model.predict(sequence_3d, verbose=0)[0][0]
-
-print("📼 [5] 영상 합성 및 저장 중...")
-if fall_prob > 0.85:
-    result_text = f"FALL DETECTED! ({fall_prob*100:.1f}%)"
-    color = (0, 0, 255) 
-else:
-    result_text = f"NORMAL ({fall_prob*100:.1f}%)"
-    color = (255, 0, 0) 
-
-for frm in annotated_frames:
-    cv2.putText(frm, result_text, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 3, cv2.LINE_AA)
-    out.write(frm)
-
 out.release()
+
 print("\n" + "="*50)
-print(f"✅ 전체 길이가 담긴 결과 영상 저장 완료: {OUTPUT_PATH}")
+print(f"✅ 개선된 결과 영상 저장 완료: {OUTPUT_PATH}")
 print("="*50)
