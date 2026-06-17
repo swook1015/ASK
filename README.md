@@ -1,51 +1,7 @@
-ASK (AI-based Real-time Action Recognition System)
-
-본 프로젝트는 한국정보처리학회(KIPS) 컨퍼런스에서 회장상을 수상한 실시간 동작 인식 알고리즘을 구현한 저장소입니다. 엣지 디바이스 환경에서의 동작 인식 파이프라인 최적화 연구를 포함하고 있습니다.
-
-1. 프로젝트 개요
-
-목표: Edge AI 환경에서의 고성능 실시간 3D 동작 인식 파이프라인 구현
-
-핵심 기술: 1D-TCN(Temporal Convolutional Network), Lifting Networks, YOLO 기반 포즈 추정
-
-연구 성과: [ASK 2026] 한국정보처리학회 회장상 수상
-
-2. 주요 코드 경로
-
-모든 핵심 소스 코드는 다음 경로에서 관리됩니다.
-
-경로: AI/Project-Code/01_FinalCode/
-
-3. 기술 성능
-
-성능 지표: 실시간 추론 최적화를 통해 엣지 디바이스에서 동작 인식 정확도와 처리 속도를 극대화하였습니다.
-
-주요 최적화: * 1D-TCN 아키텍처 개선을 통한 추론 효율성 향상
-
-모델 가중치 최적화를 통한 경량화 완료
-
-4. 디렉토리 구조
-
-ASK/
-├── AI/
-│   ├── Project-Code/
-│   │   └── 01_FinalCode/    # 핵심 소스 코드 및 파이프라인
-│   ├── dataset/             # (Git 관리 제외 대상)
-│   └── models/              # 학습된 모델 가중치
-├── requirements.txt         # 의존성 라이브러리 명세
-└── README.md
-
-
-5. 시작하기
-
-# 의존성 설치
-pip install -r requirements.txt
-
-# 핵심 파이프라인 실행
-cd AI/Project-Code/01_FinalCode/
-python [파일명].py
-
-
-6. 라이선스 및 참조
-
-본 연구는 한국정보처리학회(KIPS) 컨퍼런스 발표 논문을 기반으로 작성되었습니다.
+🛡️ Real-time Fall Detection System: End-to-End Edge AI Pipeline📝 프로젝트 소개본 프로젝트는 Edge TPU(Google Coral) 환경에서 독립적으로 구동되는 실시간 3D 낙상 감지 파이프라인입니다. YOLOv8-Pose를 통해 추출된 2D 좌표를 3D 공간으로 리프팅(Lifting)하고, 이를 1D-TCN(Temporal Convolutional Network)으로 분석하여 낙상을 탐지합니다. 11,000개 이상의 다각도 영상 데이터(NTU RGB+D)를 활용한 통합 실증을 통해 시스템의 강건성과 실시간성을 검증했습니다.🚀 핵심 성과 및 기능1. 통합 검증 성능 (Pipeline 실증)최종 정확도: 98.56% (11,000개 이상의 Cross-View 원본 영상 기반 End-to-End 실증)단일 분류기 성능: 99.79% (18,960건의 3D 스켈레톤 정답지 기반 분류 성능)실시간성: Edge TPU 가속을 통해 모델 추론 및 시각화 포함 73.5ms/frame 달성2. 기술적 핵심 포인트2-Pass 스케일 정규화 (Cross-View): 카메라 앵글 변화에 따른 크기 왜곡을 해결하기 위해 영상 전체 데이터에서 Global Max-Dist를 사전 추출하여 동적 정규화를 적용했습니다.시계열 기울기 폭주 방어: 뼈대 결측치(LOST TARGET)가 발생할 경우 직전 데이터를 유지하고 EMA 필터를 적용하여 낙상 판별의 신뢰성을 확보했습니다.임계값(Threshold) 최적화: 낙상 판정 임계값을 0.9로 세밀하게 튜닝하여, 웅크리기(물건 줍기 등)와 같은 가짜 낙상(FP) 동작을 완벽하게 차단했습니다.End-to-End 하드웨어 최적화: PC용 무거운 라이브러리(ultralytics) 의존성을 제거하고 TFLite 및 PyCoral 기반의 100% 하드웨어 매핑 파이프라인을 구축했습니다.🏗️ 시스템 아키텍처Vision Engine: YOLOv8-Pose (INT8 Quantized)Spatial Recovery: Lifting Network (LPN)Temporal Analysis: 1D-TCN (8-layer pure NTU)📊 Evaluation ResultsMetricH5 (FP32)TFLite (INT8)Accuracy99.79%99.79%Precision96.01%96.01%Recall91.46%91.46%F1-Score93.68%93.68%Confusion Matrix (End-to-End Test)TN (18632) | FP (12)
+FN (27)    | TP (289)
+🏃 실행 방법1. 모델 가속 환경 설정Bashexport TF_ENABLE_ONEDNN_OPTS=0
+export TF_LITE_DISABLE_XNNPACK=1
+2. 통합 파이프라인 검증Bash# 영상 데이터셋 기반 엔드투엔드 평가 및 시각화 저장
+python ALL_PipeLineTest12-0408.py
+👤 AuthorHeo Seong-wook - VML (Vision & Multimedia Lab) Research Team LeaderAward: Korea Information Processing Society President's Prize (ASK 2026)
