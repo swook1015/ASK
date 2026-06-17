@@ -12,15 +12,16 @@
 ## 📝 프로젝트 소개
 본 프로젝트는 **Google Coral Edge TPU** 환경에서 독립적으로 구동되는 **고성능 실시간 3D 낙상 감지 파이프라인**입니다. `YOLOv8-Pose`로 관절 좌표를 추출하고, `Lifting Network(LPN)`를 통해 2D 좌표를 3D 공간으로 복원한 뒤, `1D-TCN(Temporal Convolutional Network)` 시계열 분석을 통해 낙상을 판별합니다.
 
-총 **11,000개 이상의 다각도 영상(NTU RGB+D)**을 활용한 통합 실증(End-to-End)을 통해 하드웨어 제약 환경에서도 높은 신뢰성을 입증하였습니다.
+**다각도 영상(NTU RGB+D)**을 활용한 통합 실증(End-to-End)을 통해 하드웨어 제약 환경에서도 높은 신뢰성을 입증하였습니다.
 
 ---
 
 ## 🚀 핵심 성과 및 기능
 
 ### 1. 학술 및 실증 지표
-* **단일 분류기 성능(모델 검증):** **99.79%** (18,960건의 3D 스켈레톤 정답지 기반)
-* **통합 파이프라인 성능(실증):** **98.56%** (11,000건의 Cross-View 원본 영상 기반)
+* **단일 분류기 성능(모델 검증):** **99.79%** <img width="1251" height="290" alt="스크린샷 2026-03-30 210619" src="https://github.com/user-attachments/assets/cd685d45-f9e5-48aa-8f0c-e927efeee093" />
+
+* **통합 파이프라인 성능(실증):** **98.56%**
 * **실시간 추론 속도:** **73.5ms/frame** (Edge TPU 가속 적용)
 
 ### 2. 기술적 핵심 포인트
@@ -33,7 +34,7 @@
 ## 🏗️ 시스템 아키텍처
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x300?text=YOLOv8-Pose+%E2%86%92+LPN+%E2%86%92+1D-TCN+Pipeline" alt="Architecture" />
+  <img width="1251" height="290" src="https://github.com/user-attachments/assets/ce4c7cbd-10a5-4777-a185-15a65e3b88fc" alt="Architecture" />
 </div>
 
 1. **Vision Engine**: YOLOv8-Pose (INT8 Quantized TFLite)
