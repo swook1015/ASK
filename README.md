@@ -59,3 +59,6 @@ export TF_LITE_DISABLE_XNNPACK=1
 
 # 3. End-to-End 전체 파이프라인 검증 실행
 python ALL_PipeLineTest12-0408.py
+
+## 연구 및 개발
+허성욱 (swook8440@gmail.com)
