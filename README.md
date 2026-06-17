@@ -1,7 +1,68 @@
-🛡️ Real-time Fall Detection System: End-to-End Edge AI Pipeline📝 프로젝트 소개본 프로젝트는 Edge TPU(Google Coral) 환경에서 독립적으로 구동되는 실시간 3D 낙상 감지 파이프라인입니다. YOLOv8-Pose를 통해 추출된 2D 좌표를 3D 공간으로 리프팅(Lifting)하고, 이를 1D-TCN(Temporal Convolutional Network)으로 분석하여 낙상을 탐지합니다. 11,000개 이상의 다각도 영상 데이터(NTU RGB+D)를 활용한 통합 실증을 통해 시스템의 강건성과 실시간성을 검증했습니다.🚀 핵심 성과 및 기능1. 통합 검증 성능 (Pipeline 실증)최종 정확도: 98.56% (11,000개 이상의 Cross-View 원본 영상 기반 End-to-End 실증)단일 분류기 성능: 99.79% (18,960건의 3D 스켈레톤 정답지 기반 분류 성능)실시간성: Edge TPU 가속을 통해 모델 추론 및 시각화 포함 73.5ms/frame 달성2. 기술적 핵심 포인트2-Pass 스케일 정규화 (Cross-View): 카메라 앵글 변화에 따른 크기 왜곡을 해결하기 위해 영상 전체 데이터에서 Global Max-Dist를 사전 추출하여 동적 정규화를 적용했습니다.시계열 기울기 폭주 방어: 뼈대 결측치(LOST TARGET)가 발생할 경우 직전 데이터를 유지하고 EMA 필터를 적용하여 낙상 판별의 신뢰성을 확보했습니다.임계값(Threshold) 최적화: 낙상 판정 임계값을 0.9로 세밀하게 튜닝하여, 웅크리기(물건 줍기 등)와 같은 가짜 낙상(FP) 동작을 완벽하게 차단했습니다.End-to-End 하드웨어 최적화: PC용 무거운 라이브러리(ultralytics) 의존성을 제거하고 TFLite 및 PyCoral 기반의 100% 하드웨어 매핑 파이프라인을 구축했습니다.🏗️ 시스템 아키텍처Vision Engine: YOLOv8-Pose (INT8 Quantized)Spatial Recovery: Lifting Network (LPN)Temporal Analysis: 1D-TCN (8-layer pure NTU)📊 Evaluation ResultsMetricH5 (FP32)TFLite (INT8)Accuracy99.79%99.79%Precision96.01%96.01%Recall91.46%91.46%F1-Score93.68%93.68%Confusion Matrix (End-to-End Test)TN (18632) | FP (12)
-FN (27)    | TP (289)
-🏃 실행 방법1. 모델 가속 환경 설정Bashexport TF_ENABLE_ONEDNN_OPTS=0
+# 🛡️ Real-time Fall Detection System: End-to-End Edge AI Pipeline
+
+<div align="center">
+
+[![Python](https://img.shields.io/badge/python-3.8+-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
+[![Edge TPU](https://img.shields.io/badge/Edge_TPU-Coral-green?style=for-the-badge)](https://coral.ai/)
+[![YOLOv8](https://img.shields.io/badge/YOLO-v8--Pose-00FFFF?style=for-the-badge&logo=ultralytics&logoColor=white)](https://github.com/ultralytics/ultralytics)
+
+</div>
+
+## 📝 프로젝트 소개
+본 프로젝트는 **Google Coral Edge TPU** 환경에서 독립적으로 구동되는 **고성능 실시간 3D 낙상 감지 파이프라인**입니다. `YOLOv8-Pose`로 관절 좌표를 추출하고, `Lifting Network(LPN)`를 통해 2D 좌표를 3D 공간으로 복원한 뒤, `1D-TCN(Temporal Convolutional Network)` 시계열 분석을 통해 낙상을 판별합니다.
+
+총 **11,000개 이상의 다각도 영상(NTU RGB+D)**을 활용한 통합 실증(End-to-End)을 통해 하드웨어 제약 환경에서도 높은 신뢰성을 입증하였습니다.
+
+---
+
+## 🚀 핵심 성과 및 기능
+
+### 1. 학술 및 실증 지표
+* **단일 분류기 성능(모델 검증):** **99.79%** (18,960건의 3D 스켈레톤 정답지 기반)
+* **통합 파이프라인 성능(실증):** **98.56%** (11,000건의 Cross-View 원본 영상 기반)
+* **실시간 추론 속도:** **73.5ms/frame** (Edge TPU 가속 적용)
+
+### 2. 기술적 핵심 포인트
+* **2-Pass 동적 정규화:** 영상 전체의 뼈대 움직임을 사전 분석하여 `Global Max-Dist`를 확보, 카메라 앵글 변화에도 강건한 성능을 보장합니다.
+* **시계열 기울기 폭주 방어:** 낙상 판정 임계값(`FALL_THRESHOLD = 0.9`) 최적화 및 `EMA 필터`를 적용하여 일상 동작(물건 줍기 등)에 의한 오탐지(FP)를 원천 차단했습니다.
+* **Cold Start 해결:** `Padding` 로직을 통해 영상의 첫 프레임부터 60프레임 버퍼를 확보하여 시스템 기동 직후의 탐지 누락을 방어했습니다.
+
+---
+
+## 🏗️ 시스템 아키텍처
+
+<div align="center">
+  <img src="https://via.placeholder.com/800x300?text=YOLOv8-Pose+%E2%86%92+LPN+%E2%86%92+1D-TCN+Pipeline" alt="Architecture" />
+</div>
+
+1. **Vision Engine**: YOLOv8-Pose (INT8 Quantized TFLite)
+2. **Spatial Recovery**: Lifting Network (LPN) for 3D Reconstruction
+3. **Temporal Analysis**: 1D-TCN (8-layer pure NTU)
+
+---
+
+## 📊 Evaluation Results (End-to-End)
+
+| Metric | Performance |
+| :--- | :---: |
+| **Accuracy** | **99.79%** |
+| **Precision** | **96.01%** |
+| **Recall** | **91.46%** |
+| **F1-Score** | **93.68%** |
+
+> **Confusion Matrix (End-to-End Validation)**
+> | | Pred Normal | Pred Fall |
+> | :--- | :---: | :---: |
+> | **Actual Normal** | 18632 | 12 |
+> | **Actual Fall** | 27 | 289 |
+
+---
+
+## 🏃 실행 방법
+
+### 1. 환경 설정
+```bash
+# 하드웨어 가속 최적화 설정
+export TF_ENABLE_ONEDNN_OPTS=0
 export TF_LITE_DISABLE_XNNPACK=1
-2. 통합 파이프라인 검증Bash# 영상 데이터셋 기반 엔드투엔드 평가 및 시각화 저장
-python ALL_PipeLineTest12-0408.py
-👤 AuthorHeo Seong-wook - VML (Vision & Multimedia Lab) Research Team LeaderAward: Korea Information Processing Society President's Prize (ASK 2026)
