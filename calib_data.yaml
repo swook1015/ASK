@@ -1,0 +1,5 @@
+names:
+- person
+nc: 1
+train: /content/calibration_images
+val: /content/calibration_images

@@ -1,0 +1,24 @@
+# 데이터셋 및 임시 폴더 제외
+AI/dataset/
+AI/임시저장/
+AI/오류가중치/
+calib_frames/
+runs/
+
+# 대용량 영상 및 데이터 파일 제외
+*.avi
+*.mp4
+*.tflite
+*.h5
+*.pt
+*.npy
+
+# 가상환경 및 도구 설정 제외
+venv/
+venv1/
+.vscode/
+
+# 기타 로그 및 분석 파일 제외
+false_negative_indices.txt
+false_positive_indices.txt
+*.log
